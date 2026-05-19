@@ -168,14 +168,14 @@ class BatchCountApp(tk.Tk):
             style.theme_use("vista")
         except tk.TclError:
             pass
-        style.configure("TButton", padding=(14, 7), font=("Microsoft YaHei UI", 10))
-        style.configure("Sidebar.TButton", padding=(16, 9), font=("Microsoft YaHei UI", 10),
+        style.configure("TButton", background="#87CEFA", foreground="#000000", padding=(14, 7), font=("Microsoft YaHei UI", 10))
+        style.configure("Sidebar.TButton", background="#87CEFA", foreground="#000000", padding=(16, 9), font=("Microsoft YaHei UI", 10),
                         anchor="center")
-        style.configure("TLabelFrame.Label", font=("Microsoft YaHei UI", 10, "bold"))
-        style.configure("Treeview", font=("Microsoft YaHei UI", 10), rowheight=26)
-        style.configure("Treeview.Heading", font=("Microsoft YaHei UI", 10, "bold"))
+        style.configure("TLabelFrame.Label", background="#87CEFA", foreground="#000000", font=("Microsoft YaHei UI", 10, "bold"))
+        style.configure("Treeview", background="#E0F7FF", foreground="#000000", fieldbackground="#E0F7FF", font=("Microsoft YaHei UI", 10), rowheight=26)
+        style.configure("Treeview.Heading", background="#87CEFA", foreground="#000000", font=("Microsoft YaHei UI", 10, "bold"))
         style.map("Sidebar.TButton",
-                  background=[("active", "#d8d8d8")])
+                  background=[("active", "#6CA6CD")])
 
     def create_widgets(self):
         self._setup_style()
