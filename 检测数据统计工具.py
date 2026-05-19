@@ -20,6 +20,7 @@ from openpyxl.styles import Font, Alignment, Border, Side
 from typing import Dict
 
 
+
 # --------------------------- 配置区 ---------------------------
 # 需要的关键列（按文件实际列顺序）
 DATE_COL = "日期"
@@ -483,6 +484,8 @@ class BatchCountApp(tk.Tk):
                 success_count += 1
         messagebox.showinfo("批量导出完成", f"成功导出 {success_count} / {len(self.file_paths)} 个文件")
         self.set_status(f"批量导出完成，成功 {success_count} 个文件")
+
+
 
 # --------------------------- 程序入口 ---------------------------
 if __name__ == "__main__":
