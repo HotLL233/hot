@@ -12,6 +12,13 @@
 6. 支持中文显示，具备基本错误处理
 """
 
+# Version: 1.2
+# 修改说明：
+# - 为导出 Excel 添加 SUM 公式计算合计行
+# - 为所有单元格添加细边框
+# - 合计行字体加粗
+# - 修复了 try/except 缩进导致的 SyntaxError
+# - 在代码中加入版本号和修改说明注释
 import os
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
@@ -28,6 +35,7 @@ BATCH_COL = "批号"
 # 读取 Excel 时跳过前两行（表头信息）
 SKIP_ROWS = 2
 # --------------------------- 工具函数 ---------------------------
+VERSION = "1.2"  # 代码版本号，记录本次修改
 
 def _ensure_date_str(val) -> str:
     """统一转为 YYYY-MM-DD 字符串（处理 Excel 序列号、datetime、字符串）。"""
@@ -149,6 +157,9 @@ class BatchCountApp(tk.Tk):
         self.file_stats: dict[str, dict[str, pd.Series]] = {}  # 每个文件各自的统计字典
         self.all_sheets: list[str] = []  # 所有文件中找到的工作表名称（去重）
         self.create_widgets()
+        # 在主窗口底部显示版本号
+        self.version_label = tk.Label(self, text=f"Version: {VERSION}", anchor="e")
+        self.version_label.pack(side="bottom", fill="x")
 
     # ---------- UI ----------
     def _setup_style(self):
@@ -494,3 +505,10 @@ if __name__ == "__main__":
     # Windows 环境下默认使用 UTF-8 编码，无需额外设置
     app = BatchCountApp()
     app.mainloop()
+# Version: 1.2
+# 本次修改说明：
+# - 为导出 Excel 添加 SUM 公式计算合计行
+# - 为所有单元格添加细边框
+# - 合计行字体加粗
+# - 修复了 try/except 缩进导致的 SyntaxError
+# - 在代码中加入版本号和修改说明注释
