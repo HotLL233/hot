@@ -50,7 +50,7 @@ def _ensure_date_str(val) -> str:
     s = str(val).strip()
     if not s or s.lower() in ("nat", "nan", "none", "null", "na"):
         return ""
-       # 尝试作为 Excel 序列号（数值或数值型字符串）
+    #       # 尝试作为 Excel 序列号（数值或数值型字符串）
     try:
         num = float(s)
         # 合理序列号范围（1~200000）
@@ -495,7 +495,6 @@ class BatchCountApp(tk.Tk):
                 success_count += 1
         messagebox.showinfo("批量导出完成", f"成功导出 {success_count} / {len(self.file_paths)} 个文件")
         self.set_status(f"批量导出完成，成功 {success_count} 个文件")
-
 
 
 # --------------------------- 程序入口 ---------------------------
