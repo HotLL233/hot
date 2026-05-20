@@ -36,6 +36,8 @@ BATCH_COL = "批号"
 SKIP_ROWS = 2
 # --------------------------- 工具函数 ---------------------------
 VERSION = "1.2"  # 代码版本号，记录本次修改
+AUTHOR = "HotLL"
+RELEASE_DATE = "2026-05-20"
 
 def _ensure_date_str(val) -> str:
     """统一转为 YYYY-MM-DD 字符串（处理 Excel 序列号、datetime、字符串）。"""
@@ -157,8 +159,9 @@ class BatchCountApp(tk.Tk):
         self.file_stats: dict[str, dict[str, pd.Series]] = {}  # 每个文件各自的统计字典
         self.all_sheets: list[str] = []  # 所有文件中找到的工作表名称（去重）
         self.create_widgets()
+        self._create_menu()
         # 在主窗口底部显示版本号
-        self.version_label = tk.Label(self, text=f"Version: {VERSION}", anchor="e")
+        self.version_label = tk.Label(self, text=f"Version: {VERSION} | Author: {AUTHOR} | Release: {RELEASE_DATE}", anchor="e")
         self.version_label.pack(side="bottom", fill="x")
 
     # ---------- UI ----------
@@ -235,6 +238,14 @@ class BatchCountApp(tk.Tk):
         status_bar.pack(fill="x", side="bottom", padx=12, pady=(0, 8))
 
     # ---------- 事件处理 ----------
+    def _create_menu(self):
+        menubar = tk.Menu(self)
+        menubar.add_command(label="关于", command=self.show_about)
+        self.config(menu=menubar)
+
+    def show_about(self):
+        info = f"版本: {VERSION}\n作者: {AUTHOR}\n发布日期: {RELEASE_DATE}"
+        messagebox.showinfo("关于", info)
     def set_status(self, msg: str):
         self.status_var.set(msg)
         self.update_idletasks()
