@@ -1,0 +1,6 @@
+# Ignore build artifacts and temporary files
+build/
+
+dist/
+*.spec
+*.log
