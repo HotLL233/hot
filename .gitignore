@@ -5,3 +5,12 @@ dist/
 *.spec
 *.log
 打包输出/
+
+# Python cache
+__pycache__/
+
+# IDE / tools
+.claude/
+
+# External repos
+galaxy/
