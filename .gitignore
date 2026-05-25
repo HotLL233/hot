@@ -15,3 +15,10 @@ __pycache__/
 # External repos
 galaxy/
 .workbuddy/
+PySide6 版本/
+Web 版本/
+
+# Build scripts
+*.iss
+setup_cx_freeze.py
+Output/
