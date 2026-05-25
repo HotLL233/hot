@@ -28,6 +28,8 @@ import sys
 import datetime as _dt
 import logging
 import json
+import locale
+locale.setlocale(locale.LC_ALL, '')
 
 # --------------------------- 依赖检查 ---------------------------
 try:
@@ -49,7 +51,18 @@ from typing import Dict, Optional
 
 # --------------------------- 日志配置 ---------------------------
 import logging.handlers
-log_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "batch_count.log")
+def _resource_path(relative_path):
+    """返回在 PyInstaller 打包环境或普通运行时的资源路径"""
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(os.path.dirname(__file__))
+    return os.path.join(base_path, relative_path)
+
+import os
+log_dir = os.path.join(os.getenv('APPDATA') or os.path.expanduser('~'), '检测数据统计工具')
+os.makedirs(log_dir, exist_ok=True)
+log_file_path = os.path.join(log_dir, "batch_count.log")
 _handler = logging.handlers.RotatingFileHandler(
     log_file_path, maxBytes=5 * 1024 * 1024, backupCount=3, delay=True, encoding="utf-8"
 )
@@ -1439,10 +1452,12 @@ class BackendApi:
         }
 
     def _get_output_dir(self) -> str:
+        """返回持久化的导出目录（与日志同目录）"""
         if not self.file_paths:
             return ""
-        base_dir = os.path.dirname(self.file_paths[0])
-        out_dir = os.path.join(base_dir, "统计后结果")
+        # 使用与日志相同的 APPDATA 目录，确保跨机器、跨用户都有写权限
+        log_dir = os.path.join(os.getenv('APPDATA') or os.path.expanduser('~'), '检测数据统计工具')
+        out_dir = os.path.join(log_dir, '统计后结果')
         os.makedirs(out_dir, exist_ok=True)
         return out_dir
 
@@ -1581,7 +1596,7 @@ class BackendApi:
 def _generate_app_icon() -> str:
     """生成应用程序图标（柱状图 .ico 文件），返回图标路径"""
     import struct
-    icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_icon.ico")
+    icon_path = _resource_path("app_icon.ico")
     if os.path.exists(icon_path):
         return icon_path
 
