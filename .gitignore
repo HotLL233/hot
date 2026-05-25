@@ -21,4 +21,5 @@ Web 版本/
 # Build scripts
 *.iss
 setup_cx_freeze.py
+# Output directory now tracked to include installer exe
 Output/
