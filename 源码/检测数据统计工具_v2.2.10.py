@@ -1634,6 +1634,8 @@ class BackendApi:
         self._merged_column_totals: Optional[pd.Series] = None
         self._export_dir: Optional[str] = None
         self._on_progress = None  # 进度回调 (current, total, message)
+        self._update_cache: Optional[dict] = None  # 检查更新结果缓存
+        self._update_cache_time: float = 0  # 上次检查时间戳
         self._load_export_config()
 
     def _load_export_config(self) -> None:
@@ -2117,60 +2119,58 @@ class BackendApi:
 
     # ---------- 在线更新 ----------
     def check_update(self) -> dict:
-        """检查 GitHub Releases 是否有新版本
+        """检查更新（读取 version.json 静态文件，无 API 限流）
         返回 {has_update, latest_version, current_version, release_notes, download_url}"""
         import urllib.request
         import urllib.error
 
-        try:
-            req = urllib.request.Request(UPDATE_API_URL)
-            req.add_header("Accept", "application/vnd.github.v3+json")
-            req.add_header("User-Agent", f"BatchTool/{VERSION}")
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            if e.code == 403:
-                logger.warning("GitHub API 限流，无法检查更新")
-                return {"error": "GitHub API 请求过于频繁，请稍后再试", "has_update": False}
-            elif e.code == 404:
-                return {"error": "未找到发布版本，请确认仓库有 Releases", "has_update": False}
-            return {"error": f"网络错误 ({e.code})", "has_update": False}
-        except Exception as e:
-            logger.warning("检查更新失败: %s", e)
-            return {"error": f"检查更新失败: {e}", "has_update": False}
+        # ------ 缓存：30 分钟内不重复请求 ------
+        if self._update_cache is not None and self._update_cache_time > 0:
+            elapsed = time.time() - self._update_cache_time
+            if elapsed < 1800:
+                logger.debug("使用缓存检查结果（%.0f 秒前）", elapsed)
+                return self._update_cache
 
-        tag_name = data.get("tag_name", "")
-        # 去除前缀 'v'
-        latest_version = tag_name.lstrip("v").strip()
+        # ------ 读取 version.json（优先 GitHub raw，其次 Gitee raw）------
+        urls = [
+            f"https://raw.githubusercontent.com/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}/main/version.json",
+        ]
+        if UPDATE_MIRROR_BASE:
+            urls.insert(0, "https://gitee.com/hotll233/hot/raw/main/version.json")
+
+        data = None
+        last_error = None
+        for url in urls:
+            try:
+                req = urllib.request.Request(url)
+                req.add_header("User-Agent", f"BatchTool/{VERSION}")
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    logger.debug("从 %s 读取版本信息成功", url.split("/")[2])
+                    break
+            except Exception as e:
+                last_error = e
+                continue
+
+        if data is None:
+            return {"error": f"网络错误，请稍后再试", "has_update": False}
+
+        latest_version = data.get("version", "").strip()
         current_version = VERSION.strip()
-
-        # 查找 .exe 安装包
-        download_url = ""
-        for asset in data.get("assets", []):
-            name = asset.get("name", "")
-            if name.endswith("_setup.exe") or name.endswith(".exe"):
-                download_url = asset.get("browser_download_url", "")
-                break
-
         has_update = self._version_greater(latest_version, current_version)
-        logger.info(
-            "检查更新: 当前=%s 最新=%s 有更新=%s",
-            current_version, latest_version, has_update,
-        )
+        logger.info("检查更新: 当前=%s 最新=%s 有更新=%s", current_version, latest_version, has_update)
 
-        # 生成镜像下载链接（如果配置了镜像）
-        mirror_url = ""
-        if UPDATE_MIRROR_BASE and download_url:
-            mirror_url = self._fetch_mirror_download_url(tag_name)
-
-        return {
+        result = {
             "has_update": has_update,
             "latest_version": latest_version,
             "current_version": current_version,
-            "release_notes": data.get("body", ""),
-            "download_url": download_url,
-            "mirror_url": mirror_url,
+            "release_notes": data.get("notes", ""),
+            "download_url": data.get("setup_url", ""),
+            "mirror_url": data.get("mirror_url", ""),
         }
+        self._update_cache = result
+        self._update_cache_time = time.time()
+        return result
 
     def _fetch_mirror_download_url(self, tag_name: str) -> str:
         """查询 Gitee 镜像仓库获取正确的下载链接"""
