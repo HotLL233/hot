@@ -1,0 +1,6 @@
+{
+  "version": "2.2.10",
+  "notes": "Gitee API 精确查询文件名 + 30分钟缓存 + GitHub限流自动切Gitee",
+  "setup_url": "https://github.com/HotLL233/hot/releases/download/v2.2.10/_v2.2.10_setup.exe",
+  "mirror_url": "https://gitee.com/hotll233/hot/releases/download/v2.2.10/检测数据统计工具_v2.2.10_setup.exe"
+}
