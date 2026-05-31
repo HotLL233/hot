@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236e45e2'/><rect x='5' y='18' width='4' height='9' rx='1' fill='white'/><rect x='11' y='12' width='4' height='15' rx='1' fill='white'/><rect x='17' y='8' width='4' height='19' rx='1' fill='white'/><rect x='23' y='14' width='4' height='13' rx='1' fill='white'/></svg>">
+<title>检测数据统计工具 v{{ version }}</title>
+<style>
+  /* ===================== 全局重置 ===================== */
+  *, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-hover: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-dim: #6e7681;
+    --purple-start: #6e45e2;
+    --purple-end: #88d3ce;
+    --blue-start: #2b5876;
+    --blue-end: #4e4376;
+    --green-start: #11998e;
+    --green-end: #38ef7d;
+    --red-start: #eb3349;
+    --red-end: #f45c43;
+    --gold-start: #f2994a;
+    --gold-end: #f2c94c;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 15px rgba(0,0,0,0.35);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --transition: 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  body {
+    font-family: 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ===================== 侧边栏 ===================== */
+  .sidebar {
+    width: 200px;
+    min-width: 200px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px;
+    gap: 10px;
+    backdrop-filter: blur(10px);
+  }
+
+  .sidebar-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+    padding-left: 4px;
+  }
+
+  .sidebar-brand {
+    font-size: 15px;
+    font-weight: 700;
+    color: #88d3ce;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: rgba(110,69,226,0.12);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(110,69,226,0.2);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .sidebar-brand .logo-icon {
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .sidebar-brand span {
+    color: #88d3ce;
+    font-weight: 700;
+  }
+
+  /* ===================== 按钮 ===================== */
+  .galaxy-btn {
+    position: relative;
+    width: 100%;
+    padding: 11px 16px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform var(--transition), box-shadow var(--transition);
+    box-shadow: var(--shadow-sm);
+    letter-spacing: 0.02em;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .galaxy-btn .btn-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .galaxy-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .galaxy-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  /* 按钮颜色变体 */
+  .galaxy-btn.primary { background: #6e45e2; }
+  .galaxy-btn.success { background: #11998e; }
+  .galaxy-btn.info    { background: #2b5876; }
+  .galaxy-btn.danger  { background: #eb3349; }
+  .galaxy-btn.warning { background: #f2994a; }
+
+  .galaxy-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* ===================== 主区域 ===================== */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px;
+    gap: 16px;
+  }
+
+  /* 顶部标题栏 */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .header-btn {
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all var(--transition);
+  }
+
+  .header-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--text-dim);
+  }
+
+  /* 文件列表面板 */
+  .file-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    max-height: 180px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .panel-title .count {
+    background: var(--border);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .file-list {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .file-list::-webkit-scrollbar {
+    width: 4px;
+  }
+  .file-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .file-item {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .file-item.active {
+    background: rgba(110,69,226,0.15);
+    color: #88d3ce;
+    font-weight: 600;
+    border: 1px solid rgba(110,69,226,0.25);
+  }
+
+  .file-item .file-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+  }
+
+  /* 结果面板 */
+  .result-panel {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .result-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .table-wrapper {
+    flex: 1;
+    overflow: auto;
+  }
+
+  .table-wrapper::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .table-wrapper::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  .table-wrapper::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  thead th {
+    background: var(--bg-secondary);
+    padding: 10px 14px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 8px 14px;
+    text-align: center;
+    border-bottom: 1px solid rgba(48,54,61,0.4);
+    color: var(--text-primary);
+  }
+
+  tbody tr:hover {
+    background: rgba(110,69,226,0.06);
+  }
+
+  tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.015);
+  }
+
+  tbody tr:nth-child(even):hover {
+    background: rgba(110,69,226,0.08);
+  }
+
+  .row-total {
+    font-weight: 700;
+    background: rgba(110,69,226,0.08) !important;
+    border-top: 2px solid rgba(110,69,226,0.3) !important;
+  }
+
+  .row-total td {
+    font-weight: 700;
+    color: #88d3ce;
+  }
+
+  .col-date {
+    font-weight: 600;
+    color: #a0a8c0;
+    min-width: 100px;
+  }
+
+  /* 状态栏 */
+  .status-bar {
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #38ef7d;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.busy {
+    background: #f2c94c;
+    animation: pulse 0.8s infinite;
+  }
+
+  .status-dot.error {
+    background: #f45c43;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ===================== 弹窗 Modal ===================== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.active {
+    display: flex;
+  }
+
+  .modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    animation: modalIn 0.25s ease;
+  }
+
+  @keyframes modalIn {
+    from { transform: scale(0.95) translateY(10px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition);
+    line-height: 1;
+  }
+
+  .modal-close:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+  }
+
+  .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    font-size: 12px;
+    font-family: 'Consolas', 'Courier New', 'Microsoft YaHei UI', monospace;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  .modal-body::-webkit-scrollbar {
+    width: 4px;
+  }
+  .modal-body::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+  }
+
+  .about-info {
+    font-size: 14px;
+    line-height: 2;
+    color: var(--text-primary);
+  }
+
+  .about-info b {
+    color: #88d3ce;
+  }
+
+  /* ===================== Toast 通知 ===================== */
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    padding: 12px 20px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+    box-shadow: var(--shadow-md);
+    animation: toastIn 0.3s ease;
+    max-width: 360px;
+    word-break: break-word;
+  }
+
+  .toast.success { background: #11998e; }
+  .toast.error   { background: #eb3349; }
+  .toast.info    { background: #2b5876; }
+
+  @keyframes toastIn {
+    from { transform: translateX(100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* ===================== 浅色主题 ===================== */
+  body.light {
+    --bg-primary: #f6f8fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #f0f2f5;
+    --border: #d0d7de;
+    --text-primary: #1f2328;
+    --text-secondary: #656d76;
+    --text-dim: #8b949e;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 15px rgba(0,0,0,0.1);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+  }
+
+  body.light thead th {
+    background: #ffffff;
+  }
+
+  body.light tbody tr:nth-child(even) {
+    background: rgba(0,0,0,0.02);
+  }
+
+  body.light tbody tr:nth-child(even):hover {
+    background: rgba(110,69,226,0.04);
+  }
+
+  body.light .row-total {
+    background: rgba(110,69,226,0.04) !important;
+  }
+
+  body.light .file-item.active {
+    background: rgba(110,69,226,0.06);
+    color: #6e45e2;
+    border: 1px solid rgba(110,69,226,0.2);
+  }
+
+  body.light .header-btn {
+    background: #f6f8fa;
+  }
+
+  body.light .header-btn:hover {
+    background: #e8eaed;
+  }
+
+  body.light .sidebar-brand {
+    background: rgba(110,69,226,0.06);
+    border: 1px solid rgba(110,69,226,0.12);
+    color: #6e45e2;
+  }
+
+  body.light .sidebar-brand span {
+    color: #6e45e2;
+  }
+
+  .theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all var(--transition);
+    color: var(--text-secondary);
+    line-height: 1;
+  }
+
+  .theme-toggle:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  /* ===================== 确认弹窗 ===================== */
+  .confirm-modal .modal-box {
+    max-width: 420px;
+    text-align: center;
+  }
+
+  .confirm-modal .confirm-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+    line-height: 1;
+  }
+
+  .confirm-modal .confirm-msg {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .confirm-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+  }
+
+  .confirm-btn {
+    padding: 9px 28px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    min-width: 90px;
+  }
+
+  .confirm-btn.ok {
+    background: #11998e;
+    color: #fff;
+  }
+
+  .confirm-btn.ok:hover {
+    box-shadow: 0 2px 10px rgba(17, 153, 142, 0.35);
+    transform: translateY(-1px);
+  }
+
+  .confirm-btn.cancel {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+
+  .confirm-btn.cancel:hover {
+    background: var(--border);
+    color: var(--text-primary);
+  }
+
+  /* ===================== 进度条 ===================== */
+  .progress-modal .modal-box {
+    max-width: 500px;
+  }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .progress-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .progress-percent {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  .progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6e45e2, #88d3ce);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  .progress-fill.indeterminate {
+    width: 30%;
+    animation: progressIndeterminate 1.5s ease-in-out infinite;
+  }
+
+  @keyframes progressIndeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+
+  .progress-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .progress-cancel-btn {
+    align-self: center;
+    padding: 8px 24px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all var(--transition);
+  }
+
+  .progress-cancel-btn:hover {
+    background: var(--border);
+    color: var(--text-primary);
+  }
+
+  /* ===================== 响应式 ===================== */
+  @media (max-width: 600px) {
+    .sidebar {
+      width: 56px;
+      min-width: 56px;
+      padding: 16px 6px;
+    }
+    .galaxy-btn {
+      font-size: 0;
+      justify-content: center;
+      padding: 10px;
+    }
+    .galaxy-btn .btn-icon {
+      margin: 0;
+    }
+    .sidebar-title, .sidebar-brand {
+      display: none;
+    }
+  }
+</style>
+</head>
+<body class="light">
+
+  <!-- ========== 隐藏文件选择器 ========== -->
+  <input type="file" id="file-input" accept=".xlsx" multiple style="display:none;">
+
+  <!-- ========== 侧边栏 ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="logo-icon">&#128202;</span><span>检测数据统计</span>
+    </div>
+    <div class="sidebar-title">操作</div>
+    <button class="galaxy-btn primary" onclick="importFiles()">
+      <span class="btn-icon">&#128194;</span> 导入文件
+    </button>
+    <button class="galaxy-btn success" onclick="batchExport()">
+      <span class="btn-icon">&#128190;</span> 批量导出
+    </button>
+    <button class="galaxy-btn info" onclick="downloadMerged()">
+      <span class="btn-icon">&#128229;</span> 下载合并结果
+    </button>
+    <button class="galaxy-btn danger" onclick="clearAll()">
+      <span class="btn-icon">&#128465;</span> 清空列表
+    </button>
+  </aside>
+
+  <!-- ========== 主区域 ========== -->
+  <div class="main">
+    <div class="header">
+      <h1>检测数据统计工具 v{{ version }}</h1>
+      <div class="header-actions">
+        <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="theme-btn">&#9788;</button>
+        <button class="header-btn" onclick="showAbout()">关于</button>
+        <button class="header-btn" onclick="showLog()">审计日志</button>
+      </div>
+    </div>
+
+    <div class="file-panel">
+      <div class="panel-title">
+        &#128196; 已导入文件 <span class="count" id="file-count">0</span>
+      </div>
+      <ul class="file-list" id="file-list">
+        <li class="empty-state">暂无文件，请点击左侧「导入文件」</li>
+      </ul>
+    </div>
+
+    <div class="result-panel">
+      <div class="result-header">
+        &#128202; 统计结果预览 <span id="view-mode" style="font-weight:400;color:var(--text-dim);font-size:11px;">— 全部文件</span>
+      </div>
+      <div class="table-wrapper">
+        <table id="result-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="status-bar">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">就绪</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 确认弹窗 ========== -->
+  <div class="modal-overlay confirm-modal" id="confirm-modal">
+    <div class="modal-box">
+      <div class="confirm-icon">&#128204;</div>
+      <div class="confirm-msg" id="confirm-msg">确认操作？</div>
+      <div class="confirm-actions">
+        <button class="confirm-btn ok" id="confirm-ok" onclick="confirmAction(true)">确定</button>
+        <button class="confirm-btn cancel" onclick="confirmAction(false)">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 进度弹窗 ========== -->
+  <div class="modal-overlay progress-modal" id="progress-modal">
+    <div class="modal-box">
+      <div class="progress-header">
+        <div class="progress-title" id="progress-title">处理中...</div>
+        <div class="progress-percent" id="progress-percent">0%</div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill indeterminate" id="progress-fill"></div>
+      </div>
+      <div class="progress-text" id="progress-text"></div>
+      <button class="progress-cancel-btn" onclick="cancelProgress()">取消</button>
+    </div>
+  </div>
+
+  <!-- ========== Toast 容器 ========== -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ========== 审计日志弹窗 ========== -->
+  <div class="modal-overlay" id="log-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>&#128220; 审计日志</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="header-btn" onclick="refreshLog()">刷新</button>
+          <button class="modal-close" onclick="closeModal('log-modal')">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="log-content"></div>
+    </div>
+  </div>
+
+  <!-- ========== 关于弹窗 ========== -->
+  <div class="modal-overlay" id="about-modal">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3>&#8505; 关于</h3>
+        <button class="modal-close" onclick="closeModal('about-modal')">&times;</button>
+      </div>
+      <div class="about-info">
+        版本: <b>v{{ version }}</b> (Web)<br>
+        作者: <b>{{ author }}</b><br>
+        技术: Flask + Pandas + 原版 UI<br><br>
+        基于检测数据统计工具 v2.2.10 重构
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===================== 全局状态 =====================
+    let selectedFileIndex = -1;
+    let fileList = [];
+    let isProcessing = false;
+    let cancelRequested = false;
+    let abortController = null;
+
+    function setStatus(msg, type) {
+      const text = document.getElementById('status-text');
+      const dot = document.getElementById('status-dot');
+      text.textContent = msg;
+      dot.className = 'status-dot';
+      if (type === 'busy') dot.classList.add('busy');
+      if (type === 'error') dot.classList.add('error');
+    }
+
+    function showToast(msg, type) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast ' + (type || 'info');
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(function() { toast.remove(); }, 3500);
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.add('active');
+    }
+
+    function updateFileList(files) {
+      fileList = files;
+      const ul = document.getElementById('file-list');
+      const count = document.getElementById('file-count');
+      count.textContent = files.length;
+      if (files.length === 0) {
+        ul.innerHTML = '<li class="empty-state">暂无文件，请点击左侧「导入文件」</li>';
+        selectedFileIndex = -1;
+        return;
+      }
+      let html = '';
+      files.forEach(function(name, i) {
+        const cls = (i === selectedFileIndex) ? 'file-item active' : 'file-item';
+        html += '<li class="' + cls + '" onclick="selectFile(' + i + ')" title="' + name + '">' +
+          '<span class="file-icon">&#128203;</span> ' + name + '</li>';
+      });
+      ul.innerHTML = html;
+    }
+
+    function renderTable(data) {
+      const thead = document.querySelector('#result-table thead');
+      const tbody = document.querySelector('#result-table tbody');
+      const modeLabel = document.getElementById('view-mode');
+      if (!data || !data.columns || data.columns.length === 0) {
+        thead.innerHTML = '';
+        tbody.innerHTML = '<tr><td colspan="10" style="padding:40px;color:var(--text-dim);">暂无统计数据</td></tr>';
+        modeLabel.textContent = '— 无数据';
+        return;
+      }
+      thead.innerHTML = '<tr>' + data.columns.map(function(c) { return '<th>' + c + '</th>'; }).join('') + '</tr>';
+      let bodyHtml = '';
+      const rows = data.rows || [];
+      rows.forEach(function(row) {
+        bodyHtml += '<tr>';
+        row.forEach(function(cell, ci) {
+          const cn = ci === 0 ? 'col-date' : '';
+          bodyHtml += '<td class="' + cn + '">' + (cell !== null && cell !== undefined ? cell : '') + '</td>';
+        });
+        bodyHtml += '</tr>';
+      });
+      if (data.totals && data.totals.length > 0) {
+        bodyHtml += '<tr class="row-total">';
+        data.totals.forEach(function(cell, ci) {
+          const cn = ci === 0 ? 'col-date' : '';
+          bodyHtml += '<td class="' + cn + '">' + (cell !== null && cell !== undefined ? cell : '') + '</td>';
+        });
+        bodyHtml += '</tr>';
+      }
+      tbody.innerHTML = bodyHtml;
+      if (data.mode) {
+        modeLabel.textContent = '— ' + data.mode;
+      }
+    }
+
+    // ===================== 进度控制 =====================
+    function updateProgress(percent, title, text) {
+      var fill = document.getElementById('progress-fill');
+      if (percent >= 0) {
+        fill.classList.remove('indeterminate');
+        fill.style.width = percent + '%';
+      } else {
+        fill.classList.add('indeterminate');
+        fill.style.width = '';
+      }
+      document.getElementById('progress-percent').textContent = percent >= 0 ? percent + '%' : '处理中...';
+      if (title) document.getElementById('progress-title').textContent = title;
+      if (text) document.getElementById('progress-text').textContent = text;
+    }
+
+    function showProgress(title) {
+      isProcessing = true;
+      cancelRequested = false;
+      updateProgress(-1, title, '');
+      openModal('progress-modal');
+    }
+
+    function hideProgress() {
+      isProcessing = false;
+      closeModal('progress-modal');
+    }
+
+    function cancelProgress() {
+      cancelRequested = true;
+      if (abortController) abortController.abort();
+      setStatus('用户取消操作', 'error');
+      hideProgress();
+    }
+
+    // ===================== 主要功能 =====================
+
+    function importFiles() {
+      if (isProcessing) {
+        showToast('请等待当前操作完成', 'info');
+        return;
+      }
+      // 触发隐藏的 file input
+      var input = document.getElementById('file-input');
+      input.value = '';
+      input.click();
+    }
+
+    // 文件选择后自动上传
+    document.getElementById('file-input').addEventListener('change', function() {
+      var files = this.files;
+      if (!files || files.length === 0) return;
+
+      showProgress('正在上传并处理...');
+      setStatus('上传中...', 'busy');
+
+      var formData = new FormData();
+      for (var i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+
+      abortController = new AbortController();
+
+      fetch('/api/import', {
+        method: 'POST',
+        body: formData,
+        signal: abortController.signal
+      })
+      .then(function(r) {
+        if (!r.ok) throw new Error('服务器错误: ' + r.status);
+        return r.json();
+      })
+      .then(function(result) {
+        hideProgress();
+        if (result.error) {
+          showToast(result.error, 'error');
+          setStatus('导入失败', 'error');
+          return;
+        }
+        updateFileList(result.files || []);
+        if (result.results) {
+          renderTable(result.results);
+          selectedFileIndex = -1;
+        }
+        setStatus(result.status || '就绪');
+        if (result.files && result.files.length > 0) {
+          showToast('成功导入 ' + result.files.length + ' 个文件', 'success');
+        }
+      })
+      .catch(function(e) {
+        if (e.name !== 'AbortError') {
+          hideProgress();
+          showToast('导入出错: ' + e.message, 'error');
+          setStatus('导入出错', 'error');
+        }
+      });
+    });
+
+    async function selectFile(index) {
+      if (isProcessing) return;
+      if (index === selectedFileIndex) {
+        selectedFileIndex = -1;
+      } else {
+        selectedFileIndex = index;
+      }
+      updateFileList(fileList);
+      setStatus('加载中...', 'busy');
+      try {
+        var resp = await fetch('/api/results?file_index=' + selectedFileIndex);
+        var data = await resp.json();
+        renderTable(data);
+        setStatus(data.mode || '就绪');
+      } catch (e) {
+        showToast('加载失败: ' + e, 'error');
+        setStatus('加载失败', 'error');
+      }
+    }
+
+    function batchExport() {
+      if (fileList.length === 0) {
+        showToast('请先导入文件', 'info');
+        return;
+      }
+      document.getElementById('confirm-msg').textContent =
+        '将为 ' + fileList.length + ' 个文件分别生成统计结果并打包下载，是否继续？';
+      openModal('confirm-modal');
+    }
+
+    function confirmAction(confirmed) {
+      closeModal('confirm-modal');
+      if (!confirmed) return;
+
+      showProgress('正在生成导出文件...');
+      setStatus('导出中...', 'busy');
+
+      abortController = new AbortController();
+
+      fetch('/api/export', {
+        method: 'POST',
+        signal: abortController.signal
+      })
+      .then(function(r) {
+        if (!r.ok) {
+          return r.json().then(function(d) { throw new Error(d.error || '导出失败'); });
+        }
+        return r.blob();
+      })
+      .then(function(blob) {
+        hideProgress();
+        // 触发下载
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        var now = new Date();
+        var ts = now.getFullYear() +
+          String(now.getMonth()+1).padStart(2,'0') +
+          String(now.getDate()).padStart(2,'0') + '_' +
+          String(now.getHours()).padStart(2,'0') +
+          String(now.getMinutes()).padStart(2,'0') +
+          String(now.getSeconds()).padStart(2,'0');
+        a.download = '检测数据统计结果_' + ts + '.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('导出完成！', 'success');
+        setStatus('导出完成');
+      })
+      .catch(function(e) {
+        if (e.name !== 'AbortError') {
+          hideProgress();
+          showToast('导出出错: ' + e.message, 'error');
+          setStatus('导出出错', 'error');
+        }
+      });
+    }
+
+    function downloadMerged() {
+      if (fileList.length === 0) {
+        showToast('请先导入文件', 'info');
+        return;
+      }
+      setStatus('生成合并结果...', 'busy');
+
+      fetch('/api/download-merged', { method: 'POST' })
+      .then(function(r) {
+        if (!r.ok) {
+          return r.json().then(function(d) { throw new Error(d.error || '下载失败'); });
+        }
+        return r.blob();
+      })
+      .then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        var now = new Date();
+        var ts = now.getFullYear() +
+          String(now.getMonth()+1).padStart(2,'0') +
+          String(now.getDate()).padStart(2,'0') + '_' +
+          String(now.getHours()).padStart(2,'0') +
+          String(now.getMinutes()).padStart(2,'0') +
+          String(now.getSeconds()).padStart(2,'0');
+        a.download = '检测数据统计_合并结果_' + ts + '.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('下载完成！', 'success');
+        setStatus('就绪');
+      })
+      .catch(function(e) {
+        showToast('下载失败: ' + e.message, 'error');
+        setStatus('下载失败', 'error');
+      });
+    }
+
+    async function clearAll() {
+      try {
+        var resp = await fetch('/api/clear', { method: 'POST' });
+        var result = await resp.json();
+        updateFileList([]);
+        renderTable(null);
+        selectedFileIndex = -1;
+        setStatus(result.status || '已清空');
+      } catch (e) {
+        showToast('清空失败: ' + e, 'error');
+      }
+    }
+
+    async function showLog() {
+      openModal('log-modal');
+      setStatus('加载日志中...', 'busy');
+      try {
+        var resp = await fetch('/api/log');
+        var content = await resp.text();
+        document.getElementById('log-content').textContent = content;
+        setStatus('就绪');
+      } catch (e) {
+        document.getElementById('log-content').textContent = '读取日志失败: ' + e;
+        setStatus('读取日志失败', 'error');
+      }
+    }
+
+    async function refreshLog() {
+      try {
+        var resp = await fetch('/api/log');
+        var content = await resp.text();
+        document.getElementById('log-content').textContent = content;
+      } catch (e) {
+        document.getElementById('log-content').textContent = '读取日志失败: ' + e;
+      }
+    }
+
+    function showAbout() {
+      openModal('about-modal');
+    }
+
+    document.querySelectorAll('.modal-overlay').forEach(function(overlay) {
+      overlay.addEventListener('click', function(e) {
+        if (e.target === this) closeModal(this.id);
+      });
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.active').forEach(function(m) { m.classList.remove('active'); });
+      }
+    });
+
+    setStatus('就绪');
+    initTheme();
+
+    function initTheme() {
+      var saved = localStorage.getItem('app-theme');
+      if (saved === 'dark') {
+        document.body.classList.remove('light');
+        document.getElementById('theme-btn').innerHTML = '&#9789;';
+      } else {
+        document.getElementById('theme-btn').innerHTML = '&#9788;';
+      }
+    }
+
+    function toggleTheme() {
+      var body = document.body;
+      var btn = document.getElementById('theme-btn');
+      body.classList.toggle('light');
+      if (body.classList.contains('light')) {
+        localStorage.setItem('app-theme', 'light');
+        btn.innerHTML = '&#9788;';
+      } else {
+        localStorage.setItem('app-theme', 'dark');
+        btn.innerHTML = '&#9789;';
+      }
+    }
+  </script>
+</body>
+</html>
