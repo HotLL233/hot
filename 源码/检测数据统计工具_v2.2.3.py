@@ -198,23 +198,46 @@ def _ensure_date_str(val) -> str:
     
     return ""
 
+def _detect_data_start_row(col: 'pd.Series', max_scan: int = 50) -> int:
+    """扫描列的前 max_scan 行，返回第一个有效日期的行号
+    未找到则返回 SKIP_ROWS（保持向后兼容）"""
+    import re
+    for i in range(min(max_scan, len(col))):
+        try:
+            val = col.iloc[i]
+        except Exception:
+            continue
+        date_str = _ensure_date_str(val)
+        if date_str and re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
+            logger.debug("自动检测到数据起始行: 第 %d 行", i + 1)
+            return i
+    logger.debug("未检测到有效日期，使用默认跳过 %d 行", SKIP_ROWS)
+    return SKIP_ROWS
+
 def read_sheet_data(file_path: str, sheet_name: str, chunk_size: int = 1000) -> Generator[pd.DataFrame, None, None]:
-    """读取工作表数据并以分块生成器返回（先全量读入再按 chunk_size 切片 yield）"""
+    """读取工作表数据并以分块生成器返回（自动识别数据起始行）"""
     pd, _ = _lazy_import_pandas()
-    logger.info("分块读取工作表 %s 来自文件 %s", sheet_name, os.path.basename(file_path))
+    logger.info("读取工作表 %s 来自文件 %s", sheet_name, os.path.basename(file_path))
     
     try:
-        # 先读取整个工作表
+        # 读取完整工作表（不跳过任何行，后续自动识别）
         df = pd.read_excel(
             file_path,
             sheet_name=sheet_name,
             header=None,
-            skiprows=SKIP_ROWS,
             engine="openpyxl"
         )
         
         if df.shape[1] < 2:
             return
+        
+        # 自动检测数据起始行：扫描 A 列找到第一个有效日期
+        auto_skip = _detect_data_start_row(df.iloc[:, 0])
+        if auto_skip > 0:
+            df = df.iloc[auto_skip:]
+            logger.info(
+                " %s: 自动跳过前 %d 行表头", sheet_name, auto_skip
+            )
             
         # 只取前两列
         df = df.iloc[:, :2].copy()

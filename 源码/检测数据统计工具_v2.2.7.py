@@ -153,6 +153,9 @@ EXPORT_CONFIG_FILE = APP_DIR / "export_config.json"
 UPDATE_REPO_OWNER: str = "HotLL233"
 UPDATE_REPO_NAME: str = "hot"
 UPDATE_API_URL: str = f"https://api.github.com/repos/{UPDATE_REPO_OWNER}/{UPDATE_REPO_NAME}/releases/latest"
+# Gitee 镜像（加速国内下载）。格式: gitee.com/{owner}/{repo}/releases/download/{tag}/{filename}
+# 留空则直连 GitHub
+UPDATE_MIRROR_BASE: str = ""  # 例如: "https://gitee.com/HotLL233/hot/releases/download"
 
 # --------------------------- 工具函数 ---------------------------
 
@@ -1544,6 +1547,7 @@ HTML_TEMPLATE = r"""
           (notes ? '<br><small style="color:var(--text-dim);">' + notes.replace(/\n/g, '<br>') + '</small>' : '') +
           '<br><button class="galaxy-btn success" onclick="doUpdateInline()" style="margin-top:8px;width:auto;display:inline-flex;font-size:12px;padding:6px 16px;">立即更新</button>';
         window._updateDownloadUrl = result.download_url;
+        window._updateMirrorUrl = result.mirror_url || '';
         setStatus('发现新版本 v' + result.latest_version);
         btn.disabled = false;
       } catch (e) {
@@ -1559,7 +1563,7 @@ HTML_TEMPLATE = r"""
       setStatus('下载更新中...', 'busy');
 
       try {
-        var result = await pywebview.api.download_update(window._updateDownloadUrl);
+        var result = await pywebview.api.download_update(window._updateDownloadUrl, window._updateMirrorUrl || '');
         if (result.error) {
           status.innerHTML = '<span style="color:#f45c43;">' + result.error + '</span>';
           setStatus('下载失败', 'error');
@@ -2159,38 +2163,67 @@ class BackendApi:
             current_version, latest_version, has_update,
         )
 
+        # 生成镜像下载链接（如果配置了镜像）
+        mirror_url = ""
+        if UPDATE_MIRROR_BASE and download_url:
+            # 从 GitHub URL 提取文件名，拼接到镜像地址
+            filename = download_url.rsplit("/", 1)[-1]
+            mirror_url = f"{UPDATE_MIRROR_BASE}/{tag_name}/{filename}"
+
         return {
             "has_update": has_update,
             "latest_version": latest_version,
             "current_version": current_version,
             "release_notes": data.get("body", ""),
             "download_url": download_url,
+            "mirror_url": mirror_url,
         }
 
-    def download_update(self, download_url: str) -> dict:
-        """下载更新安装包到临时目录并静默启动"""
+    def download_update(self, download_url: str, mirror_url: str = "") -> dict:
+        """下载更新安装包到临时目录并静默启动
+        优先尝试镜像链接，失败则回退到原始链接"""
         import urllib.request
         import tempfile
 
+        urls_to_try = []
+        if mirror_url:
+            urls_to_try.append(("镜像", mirror_url))
+        urls_to_try.append(("原始", download_url))
+
         try:
-            # 下载到临时目录
             tmp_dir = tempfile.gettempdir()
             installer_path = os.path.join(tmp_dir, f"检测数据统计工具_Setup_{VERSION}.exe")
 
-            logger.info("开始下载更新: %s -> %s", download_url, installer_path)
-
-            req = urllib.request.Request(download_url)
-            req.add_header("User-Agent", f"BatchTool/{VERSION}")
-            with urllib.request.urlopen(req, timeout=300) as resp:
-                total = int(resp.headers.get("Content-Length", 0))
-                downloaded = 0
-                with open(installer_path, "wb") as f:
-                    while True:
-                        chunk = resp.read(8192)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        downloaded += len(chunk)
+            last_error = None
+            for source_name, url in urls_to_try:
+                try:
+                    logger.info("尝试从%s下载: %s", source_name, url)
+                    req = urllib.request.Request(url)
+                    req.add_header("User-Agent", f"BatchTool/{VERSION}")
+                    with urllib.request.urlopen(req, timeout=15) as resp:
+                        total = int(resp.headers.get("Content-Length", 0))
+                        downloaded = 0
+                        chunk_size = 64 * 1024
+                        start_time = time.time()
+                        with open(installer_path, "wb") as f:
+                            while True:
+                                chunk = resp.read(chunk_size)
+                                if not chunk:
+                                    break
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                    logger.info("%s下载完成: %d bytes", source_name, downloaded)
+                    break  # 成功，跳出循环
+                except Exception as e:
+                    logger.warning("%s下载失败: %s", source_name, e)
+                    last_error = e
+                    # 删除不完整的文件
+                    if os.path.exists(installer_path):
+                        os.remove(installer_path)
+                    continue
+            else:
+                # 所有源都失败
+                raise last_error or RuntimeError("所有下载源均失败")
 
             logger.info("下载完成: %s (%d bytes)", installer_path, downloaded)
 

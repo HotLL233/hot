@@ -11,6 +11,7 @@ __pycache__/
 
 # IDE / tools
 .claude/
+.codebuddy/
 
 # External repos
 galaxy/

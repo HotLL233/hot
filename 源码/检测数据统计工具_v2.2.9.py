@@ -2161,9 +2161,7 @@ class BackendApi:
         # 生成镜像下载链接（如果配置了镜像）
         mirror_url = ""
         if UPDATE_MIRROR_BASE and download_url:
-            # 从 GitHub URL 提取文件名，拼接到镜像地址
-            filename = download_url.rsplit("/", 1)[-1]
-            mirror_url = f"{UPDATE_MIRROR_BASE}/{tag_name}/{filename}"
+            mirror_url = self._fetch_mirror_download_url(tag_name)
 
         return {
             "has_update": has_update,
@@ -2173,6 +2171,23 @@ class BackendApi:
             "download_url": download_url,
             "mirror_url": mirror_url,
         }
+
+    def _fetch_mirror_download_url(self, tag_name: str) -> str:
+        """查询 Gitee 镜像仓库获取正确的下载链接"""
+        import urllib.request
+        try:
+            api_url = f"https://gitee.com/api/v5/repos/hotll233/hot/releases/tags/{tag_name}"
+            req = urllib.request.Request(api_url)
+            req.add_header("User-Agent", f"BatchTool/{VERSION}")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                release_data = json.loads(resp.read().decode("utf-8"))
+                for asset in release_data.get("assets", []):
+                    name = asset.get("name", "")
+                    if name.endswith("_setup.exe") or name.endswith(".exe"):
+                        return asset.get("browser_download_url", "")
+        except Exception as e:
+            logger.debug("获取镜像下载链接失败: %s", e)
+        return ""
 
     def download_update(self, download_url: str, mirror_url: str = "") -> dict:
         """下载更新安装包到临时目录并静默启动
