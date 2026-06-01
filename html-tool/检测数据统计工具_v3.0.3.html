@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236e45e2'/><rect x='5' y='18' width='4' height='9' rx='1' fill='white'/><rect x='11' y='12' width='4' height='15' rx='1' fill='white'/><rect x='17' y='8' width='4' height='19' rx='1' fill='white'/><rect x='23' y='14' width='4' height='13' rx='1' fill='white'/></svg>">
-<title>检测数据统计工具 v3.0.3</title>
+<title>检测数据统计工具 v3.0.4</title>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"></script>
@@ -670,11 +670,8 @@
     <button class="galaxy-btn primary" onclick="importFiles()">
       <span class="btn-icon">&#128194;</span> 导入文件
     </button>
-    <button class="galaxy-btn primary" onclick="importFolder()" style="margin-top:6px;" title="多文件夹导入：可连续选择多个文件夹，自动递归扫描所有 .xlsx（含子文件夹），完成后统一导入">
+    <button class="galaxy-btn primary" onclick="importFolder()" style="margin-top:6px;" title="选择父级目录，自动递归扫描所有子文件夹内的 .xlsx，一次导入">
       <span class="btn-icon">&#128193;</span> 导入文件夹
-    </button>
-    <button class="galaxy-btn primary" onclick="importFolderRecursive()" style="margin-top:6px;" title="选择父级目录，自动递归扫描所有子文件夹内的 .xlsx，一次导入">
-      <span class="btn-icon">&#128447;</span> 导入文件夹（含子文件夹）
     </button>
     <button class="galaxy-btn success" onclick="batchExport()">
       <span class="btn-icon">&#128190;</span> 批量导出
@@ -690,7 +687,7 @@
   <!-- ========== 主区域 ========== -->
   <div class="main">
     <div class="header">
-      <h1>检测数据统计工具 v3.0.3</h1>
+      <h1>检测数据统计工具 v3.0.4</h1>
       <div class="header-actions">
         <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="theme-btn">&#9788;</button>
         <button class="header-btn" onclick="showAbout()">关于</button>
@@ -776,7 +773,7 @@
         <button class="modal-close" onclick="closeModal('about-modal')">&times;</button>
       </div>
       <div class="about-info">
-        版本: <b>v3.0.3</b> (独立 HTML 版)<br>
+        版本: <b>v3.0.4</b> (独立 HTML 版)<br>
         作者: <b>HotLL</b><br>
         技术: 纯前端 JavaScript + SheetJS<br><br>
         基于检测数据统计工具 v2.2.10 核心逻辑<br>
@@ -791,7 +788,7 @@
 //  核心引擎 — 完整移植 v2.2.10 Python 逻辑到 JavaScript
 // ===================================================================
 
-const VERSION = "3.0.3";
+const VERSION = "3.0.4";
 const DATE_COL = "日期";
 const BATCH_COL = "批号";
 const SKIP_ROWS = 2;
@@ -1647,142 +1644,8 @@ function collectXlsxFromEntries(entries, callback) {
   entries.forEach(function(e) { readEntry(e); });
 }
 
-// ---- 多文件夹导入（循环选择 + 累积处理）----
+// ---- 导入文件夹：选一个父级目录，自动递归扫描所有子文件夹，一次导入 ----
 async function importFolder() {
-  if (isProcessing) {
-    showToast("请等待当前操作完成", "info");
-    return;
-  }
-
-  // 检查 API 可用性
-  if (!window.showDirectoryPicker && !document.getElementById("folder-input")) {
-    showToast("当前浏览器不支持文件夹导入", "info");
-    return;
-  }
-
-  var allFiles = [];          // 累积所有 .xlsx 文件
-  var folderNames = [];       // 记录已选文件夹名称（用于日志）
-  var totalScanned = 0;       // 总扫描文件数（含重复）
-  var round = 0;
-
-  while (true) {
-    round++;
-    var filesThisRound = [];
-
-    if (window.showDirectoryPicker) {
-      // 方案 A: File System Access API（Chrome/Edge）
-      try {
-        var dirHandle = await window.showDirectoryPicker({
-          mode: "read",
-          // 第二轮开始提示可继续添加
-          startIn: undefined
-        });
-        var dirName = dirHandle.name || ("文件夹" + round);
-        setStatus("正在扫描「" + dirName + "」...", "busy");
-        filesThisRound = await collectXlsxFromDirHandle(dirHandle);
-        folderNames.push(dirName);
-      } catch(err) {
-        if (err.name === "AbortError") {
-          // 用户取消选择
-          if (round === 1 && allFiles.length === 0) {
-            setStatus("就绪");
-            return; // 第一轮就取消，不做任何事
-          }
-          break; // 后续轮次取消，结束循环
-        }
-        _log("WARNING", "FS Access API 失败: " + err.message);
-        break;
-      }
-    } else {
-      // 方案 B: webkitdirectory fallback（Firefox 等）
-      var result = await pickFolderViaInput();
-      if (!result || result.files.length === 0) {
-        if (round === 1 && allFiles.length === 0) {
-          setStatus("就绪");
-          return;
-        }
-        break;
-      }
-      filesThisRound = result.files;
-      folderNames.push(result.folderName || ("文件夹" + round));
-    }
-
-    if (filesThisRound.length === 0) {
-      showToast("「" + (folderNames[folderNames.length - 1]) + "」内未找到 .xlsx 文件", "info");
-    } else {
-      allFiles = allFiles.concat(filesThisRound);
-      totalScanned += filesThisRound.length;
-    }
-
-    // 询问是否继续
-    var summary = "已添加 " + folderNames.length + " 个文件夹，共 " + allFiles.length + " 个文件";
-    setStatus(summary, "busy");
-    var keepGoing = confirm(summary + "。\n\n是否继续添加文件夹？");
-    if (!keepGoing) break;
-  }
-
-  if (allFiles.length === 0) {
-    setStatus("就绪");
-    showToast("未找到任何 .xlsx 文件", "info");
-    return;
-  }
-
-  _log("INFO", "多文件夹导入: " + folderNames.length + " 个文件夹 → " + allFiles.length + " 个文件");
-  showToast("从 " + folderNames.length + " 个文件夹中扫描到 " + allFiles.length + " 个文件，正在导入...", "info");
-  setStatus("正在导入 " + allFiles.length + " 个文件...", "busy");
-  processFiles(allFiles);
-}
-
-// webkitdirectory 的一次性选择（返回 Promise）
-function pickFolderViaInput() {
-  return new Promise(function(resolve) {
-    var input = document.getElementById("folder-input");
-    var handler = function() {
-      input.removeEventListener("change", handler);
-      if (input.files && input.files.length > 0) {
-        var xlsxFiles = [];
-        for (var i = 0; i < input.files.length; i++) {
-          var f = input.files[i];
-          if (f.name.toLowerCase().endsWith(".xlsx") && !f.name.startsWith("~$")) {
-            xlsxFiles.push(f);
-          }
-        }
-        // 尝试从第一个文件的 webkitRelativePath 推断文件夹名
-        var folderName = "";
-        if (input.files[0].webkitRelativePath) {
-          var parts = input.files[0].webkitRelativePath.split("/");
-          folderName = parts[0] || "";
-        }
-        resolve({ files: xlsxFiles, folderName: folderName });
-      } else {
-        resolve(null);
-      }
-    };
-    input.addEventListener("change", handler);
-    input.value = "";
-    input.click();
-  });
-}
-
-// FS Access API 递归收集 .xlsx
-async function collectXlsxFromDirHandle(dirHandle) {
-  var results = [];
-  for await (var [name, handle] of dirHandle.entries()) {
-    if (handle.kind === "file") {
-      if (name.toLowerCase().endsWith(".xlsx") && !name.startsWith("~$")) {
-        var file = await handle.getFile();
-        results.push(file);
-      }
-    } else if (handle.kind === "directory") {
-      var sub = await collectXlsxFromDirHandle(handle);
-      results = results.concat(sub);
-    }
-  }
-  return results;
-}
-
-// ---- 导入文件夹（含子文件夹）：选一个父级目录，自动递归扫描所有子文件夹，一次导入 ----
-async function importFolderRecursive() {
   if (isProcessing) {
     showToast("请等待当前操作完成", "info");
     return;
@@ -1832,6 +1695,53 @@ async function importFolderRecursive() {
   showToast("扫描到 " + filesThisRound.length + " 个文件，正在导入...", "info");
   setStatus("正在导入 " + filesThisRound.length + " 个文件...", "busy");
   processFiles(filesThisRound);
+}
+
+// webkitdirectory 的一次性选择（返回 Promise）
+function pickFolderViaInput() {
+  return new Promise(function(resolve) {
+    var input = document.getElementById("folder-input");
+    var handler = function() {
+      input.removeEventListener("change", handler);
+      if (input.files && input.files.length > 0) {
+        var xlsxFiles = [];
+        for (var i = 0; i < input.files.length; i++) {
+          var f = input.files[i];
+          if (f.name.toLowerCase().endsWith(".xlsx") && !f.name.startsWith("~$")) {
+            xlsxFiles.push(f);
+          }
+        }
+        var folderName = "";
+        if (input.files[0].webkitRelativePath) {
+          var parts = input.files[0].webkitRelativePath.split("/");
+          folderName = parts[0] || "";
+        }
+        resolve({ files: xlsxFiles, folderName: folderName });
+      } else {
+        resolve(null);
+      }
+    };
+    input.addEventListener("change", handler);
+    input.value = "";
+    input.click();
+  });
+}
+
+// FS Access API 递归收集 .xlsx
+async function collectXlsxFromDirHandle(dirHandle) {
+  var results = [];
+  for await (var [name, handle] of dirHandle.entries()) {
+    if (handle.kind === "file") {
+      if (name.toLowerCase().endsWith(".xlsx") && !name.startsWith("~$")) {
+        var file = await handle.getFile();
+        results.push(file);
+      }
+    } else if (handle.kind === "directory") {
+      var sub = await collectXlsxFromDirHandle(handle);
+      results = results.concat(sub);
+    }
+  }
+  return results;
 }
 
 function selectFile(index) {

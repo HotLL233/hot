@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-检测数据统计工具 v2.2.13 - 双平台同步版
+检测数据统计工具 v2.2.14 - 双平台同步版
 -----------------------------------
-新增 (v2.2.12 → v2.2.13)：
-1. 新增「导入文件夹（含子文件夹）」：选一个父级目录，自动递归扫描所有子文件夹 .xlsx，一次导入
-2. 保留原有「导入文件夹」多选循环模式
+变更 (v2.2.13 → v2.2.14)：
+1. 合并导入文件夹功能：取消多选循环模式，「导入文件夹」统一为一键递归扫描
+2. 删除 import_folder() 循环方法，将 import_folder_recursive 重命名为 import_folder
 """
 
-# Version: 2.2.13
+# Version: 2.2.14
 # 更新说明：
-# - 新增 import_folder_recursive()：选一个父级目录，自动递归扫描所有子文件夹 .xlsx
-# - 保留原有 import_folder() 多选循环模式
+# - 合并导入文件夹功能：取消多选循环模式，统一为一键递归扫描
+# - import_folder_recursive 重命名为 import_folder（删除旧循环版）
 
 from __future__ import annotations
 
@@ -136,7 +136,7 @@ logger = logging.getLogger(__name__)
 DATE_COL: str = "日期"
 BATCH_COL: str = "批号"
 SKIP_ROWS: int = 2
-VERSION: str = "2.2.13"
+VERSION: str = "2.2.14"
 AUTHOR: str = "HotLL"
 RELEASE_DATE: str = "2026-06-01"
 
@@ -1155,11 +1155,8 @@ HTML_TEMPLATE = r"""
     <button class="galaxy-btn primary" onclick="importFiles()">
       <span class="btn-icon">&#128194;</span> 导入文件
     </button>
-    <button class="galaxy-btn primary" onclick="importFolder()" style="margin-top:6px;" title="多文件夹导入：可连续选择多个文件夹，自动递归扫描子文件夹内所有 .xlsx，完成后统一导入">
-      <span class="btn-icon">&#128447;</span> 导入文件夹
-    </button>
-    <button class="galaxy-btn primary" onclick="importFolderRecursive()" style="margin-top:6px;" title="选择父级目录，自动递归扫描所有子文件夹内的 .xlsx，一次导入">
-      <span class="btn-icon">&#128193;</span> 导入文件夹（含子文件夹）
+    <button class="galaxy-btn primary" onclick="importFolder()" style="margin-top:6px;" title="选择父级目录，自动递归扫描所有子文件夹内的 .xlsx，一次导入">
+      <span class="btn-icon">&#128193;</span> 导入文件夹
     </button>
     <button class="galaxy-btn success" onclick="batchExport()">
       <span class="btn-icon">&#128190;</span> 批量导出
@@ -1418,47 +1415,15 @@ HTML_TEMPLATE = r"""
       }
     }
 
-    // 多文件夹导入（后端循环选择 + 累积处理）
+    // 导入文件夹：选一个父级目录，自动递归扫描所有子文件夹 .xlsx，一次导入
     async function importFolder() {
-      if (isProcessing) {
-        showToast('请等待当前操作完成', 'info');
-        return;
-      }
-      setStatus('正在选择文件夹（可连续多选）…', 'busy');
-      showToast('可连续选择多个文件夹，按取消结束选择', 'info');
-      try {
-        const result = await pywebview.api.import_folder();
-        if (result.error) {
-          showToast(result.error, 'info');
-          setStatus('就绪');
-          return;
-        }
-        updateFileList(result.files || []);
-        if (result.results) {
-          renderTable(result.results);
-          selectedFileIndex = -1;
-        }
-        setStatus(result.status || '就绪');
-        if (result.imported_count > 0) {
-          showToast('导入完成：新增 ' + result.imported_count + ' 个文件，共 ' + (result.files || []).length + ' 个', 'success');
-        } else if (result.files && result.files.length > 0) {
-          showToast(result.status || '无新文件', 'info');
-        }
-      } catch (e) {
-        showToast('导入文件夹出错: ' + e, 'error');
-        setStatus('导入出错', 'error');
-      }
-    }
-
-    // 导入文件夹（含子文件夹）：选一个父级目录，自动递归扫描所有子文件夹 .xlsx，一次导入
-    async function importFolderRecursive() {
       if (isProcessing) {
         showToast('请等待当前操作完成', 'info');
         return;
       }
       setStatus('正在选择文件夹...', 'busy');
       try {
-        const result = await pywebview.api.import_folder_recursive();
+        const result = await pywebview.api.import_folder();
         if (result.error) {
           showToast(result.error, 'info');
           setStatus('就绪');
@@ -1878,130 +1843,7 @@ class BackendApi:
         }
 
     def import_folder(self) -> dict:
-        """多文件夹导入：循环选择文件夹，累积 .xlsx 后统一处理"""
-        tk, filedialog = _lazy_import_tkinter()
-        messagebox = __import__("tkinter.messagebox", fromlist=["messagebox"])
-
-        all_found_paths = []   # 所有文件夹扫描到的 .xlsx
-        folder_names = []      # 已选文件夹名称
-        round_num = 0
-
-        while True:
-            round_num += 1
-
-            root = tk.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-
-            title = "请选择数据文件夹（第 %d 个）" % round_num if round_num > 1 else "请选择数据文件夹（可连续多选，按取消结束）"
-            folder = filedialog.askdirectory(title=title)
-            root.destroy()
-
-            if not folder:
-                break  # 用户取消，结束循环
-
-            # 递归扫描
-            found = []
-            for root_dir, _dirs, files in os.walk(folder):
-                for fname in files:
-                    if fname.lower().endswith(".xlsx") and not fname.startswith("~$"):
-                        found.append(os.path.join(root_dir, fname))
-
-            folder_names.append(os.path.basename(folder) or folder)
-            all_found_paths.extend(found)
-            logger.info("文件夹 [%d] %s：找到 %d 个 .xlsx", round_num, folder, len(found))
-
-            if not found:
-                messagebox.showinfo("提示", "「%s」内未找到 .xlsx 文件。" % folder_names[-1])
-
-            # 询问是否继续
-            summary = "已添加 %d 个文件夹，共 %d 个文件" % (len(folder_names), len(all_found_paths))
-            if not messagebox.askyesno("继续添加？", "%s。\n\n是否继续添加文件夹？" % summary):
-                break
-
-        if round_num == 1 and not folder:
-            # 第一轮就取消了
-            msg = "未选择任何文件夹"
-            logger.info(msg)
-            return {
-                "error": msg,
-                "files": [os.path.basename(p) for p in self.file_paths],
-                "results": None,
-                "status": "就绪",
-                "imported_count": 0,
-            }
-
-        if not all_found_paths:
-            logger.info("所有文件夹内均无 .xlsx")
-            file_names = [os.path.basename(p) for p in self.file_paths]
-            return {
-                "files": file_names,
-                "results": self._df_to_table_json(
-                    self._merged_results,
-                    self._merged_total,
-                    self._merged_column_totals,
-                    "全部文件",
-                ) if self._merged_results is not None else None,
-                "status": "就绪（%d 个文件夹内无有效文件）" % len(folder_names),
-                "imported_count": 0,
-            }
-
-        logger.info(
-            "多文件夹导入：%d 个文件夹 → %d 个 .xlsx",
-            len(folder_names), len(all_found_paths),
-        )
-
-        # 去重
-        existing_set = set(self.file_paths)
-        new_paths = [p for p in all_found_paths if p not in existing_set]
-        duplicate_count = len(all_found_paths) - len(new_paths)
-        if duplicate_count > 0:
-            logger.info("跳过 %d 个已导入的重复文件", duplicate_count)
-
-        if not new_paths:
-            file_names = [os.path.basename(p) for p in self.file_paths]
-            return {
-                "files": file_names,
-                "results": self._df_to_table_json(
-                    self._merged_results,
-                    self._merged_total,
-                    self._merged_column_totals,
-                    "全部文件",
-                ) if self._merged_results is not None else None,
-                "status": "%d 个文件夹内 %d 个文件均已导入，当前共 %d 个" % (
-                    len(folder_names), len(all_found_paths), len(self.file_paths)),
-                "imported_count": 0,
-            }
-
-        # 追加
-        old_count = len(self.file_paths)
-        self.file_paths.extend(new_paths)
-        logger.info(
-            "导入：新增 %d 个文件（已有 %d → 共 %d）",
-            len(new_paths), old_count, len(self.file_paths),
-        )
-
-        # 增量统计
-        result = self._process_files(on_progress=self._on_progress, rebuild_all=False)
-        if result.get("error"):
-            return result
-
-        file_names = [os.path.basename(p) for p in self.file_paths]
-        return {
-            "files": file_names,
-            "results": self._df_to_table_json(
-                self._merged_results,
-                self._merged_total,
-                self._merged_column_totals,
-                "全部文件",
-            ),
-            "status": "从 %d 个文件夹导入 %d 个新文件（共 %d 个）" % (
-                len(folder_names), len(new_paths), len(self.file_paths)),
-            "imported_count": len(new_paths),
-        }
-
-    def import_folder_recursive(self) -> dict:
-        """导入文件夹（含子文件夹）：选一个父级目录，递归扫描所有子文件夹中的 .xlsx，一次完成导入"""
+        """导入文件夹：选一个父级目录，递归扫描所有子文件夹中的 .xlsx，一次完成导入"""
         tk, filedialog = _lazy_import_tkinter()
 
         root = tk.Tk()

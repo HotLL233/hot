@@ -87,8 +87,9 @@ def _ensure_date_str(val) -> str:
     return ""
 
 
-def _detect_data_start_row(df: pd.DataFrame, max_scan: int = 50) -> Tuple[int, int]:
-    """扫描前 max_scan 行，返回 (数据起始行, 日期所在列)"""
+def _detect_data_start_row(df: pd.DataFrame, max_scan: int = 50) -> int:
+    """扫描前 max_scan 行 × 前 30 列，返回第一个有效日期所在的行号
+    未找到则返回 SKIP_ROWS（保持向后兼容）"""
     import re
     ncols = min(df.shape[1], 30)
     for row_idx in range(min(max_scan, df.shape[0])):
@@ -99,61 +100,99 @@ def _detect_data_start_row(df: pd.DataFrame, max_scan: int = 50) -> Tuple[int, i
                 continue
             date_str = _ensure_date_str(val)
             if date_str and re.match(r"^\d{4}-\d{2}-\d{2}$", date_str):
-                return row_idx, col_idx
-    return SKIP_ROWS, 0
+                logger.debug("自动检测到数据起始行: 第 %d 行 (第 %d 列)", row_idx + 1, col_idx + 1)
+                return row_idx
+    logger.debug("未检测到有效日期，使用默认跳过 %d 行", SKIP_ROWS)
+    return SKIP_ROWS
 
 
-def _detect_batch_col_in_data(df_data: pd.DataFrame, date_col: int,
-                              search_rows: int = 5) -> int:
-    """在数据区扫描批号列：优先找批号关键词（排除日期列），找不到则用日期列右侧"""
-    batch_keywords = ["批号", "batch", "lot", "编号", "序号", "样品批号", "样品编号", "code", "id"]
-    for r in range(min(search_rows, df_data.shape[0])):
-        for c in range(df_data.shape[1]):
-            if c == date_col:
-                continue  # 跳过已知的日期列，避免编码冲突误匹配
+def _detect_columns(header_df: pd.DataFrame, max_header_rows: int = 3) -> Tuple[int, int]:
+    """扫描表头区域，自动识别日期列和批号列的位置
+    返回 (date_col, batch_col)，未识别到则回退默认 (0, 1)"""
+    date_keywords = [
+        "日期", "date", "时间", "time",
+        "检测日期", "采样日期", "报告日期", "分析日期", "送检日期", "检验日期",
+    ]
+    batch_keywords = [
+        "批号", "batch", "lot",
+        "编号", "序号",
+        "样品批号", "样品编号", "样品号", "样品名称",
+        "实验编号", "样本号",
+        "code", "id",
+    ]
+
+    date_col = 0
+    batch_col = 1
+    date_found = False
+    batch_found = False
+
+    if header_df.empty or header_df.shape[1] < 2:
+        return date_col, batch_col
+
+    # 从表头区域最后几行向上扫描（最靠近数据的表头行优先）
+    start = max(0, header_df.shape[0] - max_header_rows)
+    for row_idx in range(header_df.shape[0] - 1, start - 1, -1):
+        for col_idx in range(min(header_df.shape[1], 30)):
             try:
-                v = str(df_data.iloc[r, c]).strip().lower()
+                val = str(header_df.iloc[row_idx, col_idx]).strip().lower()
             except Exception:
                 continue
-            if not v:
+            if not val:
                 continue
-            if any(kw in v for kw in batch_keywords):
-                return c
-    # 未找到，用日期列右侧
-    if date_col + 1 < df_data.shape[1]:
-        return date_col + 1
-    return max(0, df_data.shape[1] - 1)
+            if not date_found and any(kw in val for kw in date_keywords):
+                date_col = col_idx
+                date_found = True
+            if not batch_found and any(kw in val for kw in batch_keywords):
+                batch_col = col_idx
+                batch_found = True
+        if date_found and batch_found:
+            break
+
+    if date_found or batch_found:
+        logger.debug(
+            "自动识别列: 日期=第%d列, 批号=第%d列 (匹配关键词)",
+            date_col + 1, batch_col + 1
+        )
+    return date_col, batch_col
 
 
 def read_sheet_data(file_path: str, sheet_name: str) -> Optional[pd.DataFrame]:
-    """读取工作表数据，返回 (日期, 批号) DataFrame"""
+    """读取工作表数据，返回 (日期, 批号) DataFrame（对齐 v2.2.10）"""
     try:
         df = pd.read_excel(file_path, sheet_name=sheet_name, header=None, engine="openpyxl")
         if df.shape[1] < 2:
             return None
-        auto_skip, date_col = _detect_data_start_row(df)
-        # 在真正的数据区确定批号列（排除日期列，避免编码冲突误匹配）
-        df_data = df.iloc[auto_skip:].copy() if auto_skip > 0 else df.copy()
-        batch_col = _detect_batch_col_in_data(df_data, date_col)
+
+        # 自动检测数据起始行：扫描找到第一个有效日期所在行
+        auto_skip = _detect_data_start_row(df)
+
+        # 提取表头区域，自动识别日期列和批号列位置
+        header_area = df.iloc[:auto_skip] if auto_skip > 0 else df.iloc[:0]
+        date_col, batch_col = _detect_columns(header_area)
+
+        # 切除表头，只保留数据行
         if auto_skip > 0:
             df = df.iloc[auto_skip:]
-        ncols = df.shape[1]
-        if date_col >= ncols:
-            date_col = 0
-        if batch_col >= ncols:
-            batch_col = min(1, ncols - 1)
+            logger.info(" %s: 自动跳过前 %d 行表头", sheet_name, auto_skip)
+
+        # 选取识别到的日期列和批号列
         df = df.iloc[:, [date_col, batch_col]].copy()
         df.columns = [DATE_COL, BATCH_COL]
         df[DATE_COL] = df[DATE_COL].apply(_ensure_date_str)
-        df[BATCH_COL] = df[BATCH_COL].fillna("").astype(str).str.strip()
-        df[BATCH_COL] = df[BATCH_COL].replace(["nan", "NaN", "None", "NaT", ""], pd.NA)
-        df = df.dropna(subset=[BATCH_COL])
+        df[BATCH_COL] = df[BATCH_COL].astype(str).str.strip()
+
+        # 前向填充日期（合并单元格场景）
         df[DATE_COL] = df[DATE_COL].replace("", pd.NA).ffill()
+
+        # 过滤无效日期行
         df = df[df[DATE_COL].str.match(r"^\d{4}-\d{2}-\d{2}$", na=False)]
+
+        # 过滤示例/模板行
         mask = pd.Series(True, index=df.index)
         for prefix in BATCH_EXAMPLE_PREFIXES:
             mask = mask & ~df[BATCH_COL].str.startswith(prefix)
         df = df[mask]
+
         return df if not df.empty else None
     except Exception as e:
         logger.error("读取 %s 失败: %s", sheet_name, e)
