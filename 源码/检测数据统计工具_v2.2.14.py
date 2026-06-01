@@ -2551,6 +2551,9 @@ def main(debug: bool = False) -> None:
 
 
 if __name__ == "__main__":
+    # GUI 模式下（--noconsole 打包），sys.stderr 可能为 None，导致 argparse 报错崩溃
+    if sys.stderr is None:
+        sys.stderr = open(os.devnull, "w")
     parser = argparse.ArgumentParser(description="检测数据统计工具")
     parser.add_argument(
         "--debug", action="store_true", help="启用 pywebview 开发者工具"
