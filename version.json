@@ -1,6 +1,6 @@
 {
   "version": "2.2.14",
   "notes": "合并导入文件夹功能：取消多选循环模式，统一为一键递归扫描子文件夹（含嵌套）。HTML 版同步更新至 v3.0.4。",
-  "setup_url": "https://github.com/HotLL233/hot/releases/download/v2.2.14/_v2.2.14.py",
-  "mirror_url": "https://gitee.com/hotll233/hot/releases/download/v2.2.14/检测数据统计工具_v2.2.14.py"
+  "setup_url": "https://github.com/HotLL233/hot/releases/download/v2.2.14/_v2.2.14.exe",
+  "mirror_url": "https://gitee.com/hotll233/hot/releases/download/v2.2.14/_v2.2.14.exe"
 }
