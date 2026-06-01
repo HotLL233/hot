@@ -121,7 +121,7 @@ if getattr(sys, 'frozen', False) and os.name == "nt":
 else:
     APP_DIR = Path(__file__).parent
 LOG_DIR = APP_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 LOG_FILE_PATH = LOG_DIR / "batch_count.log"
 
 _handler = logging.handlers.RotatingFileHandler(
