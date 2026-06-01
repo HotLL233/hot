@@ -41,3 +41,8 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "运行 {#MyAppName}"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{localappdata}\{#MyAppName}\logs"
+Type: files; Name: "{localappdata}\{#MyAppName}\export_config.json"
+Type: dirifempty; Name: "{localappdata}\{#MyAppName}"
