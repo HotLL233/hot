@@ -1926,6 +1926,8 @@ class BackendApi:
             "status": f"文件夹导入完成：新增 {len(new_paths)} 个文件，共 {len(self.file_paths)} 个",
             "imported_count": len(new_paths),
         }
+
+    def _process_files(self, on_progress=None, rebuild_all: bool = True) -> dict:
         """处理所有已导入文件
 
         Args:
