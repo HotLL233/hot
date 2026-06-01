@@ -23,6 +23,7 @@ SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
 PrivilegesRequired=admin
+SetupIconFile=app_icon.ico
 
 [Languages]
 Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"

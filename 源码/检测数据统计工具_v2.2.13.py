@@ -115,8 +115,11 @@ def _resource_path(relative_path: str) -> str:
         base_path = _get_app_dir()
     return str(base_path / relative_path)
 
-# 日志文件放在程序目录下的 logs 文件夹
-APP_DIR = _get_app_dir()
+# 日志文件放在用户 LocalAppData 目录（避免安装到 Program Files 后无写入权限）
+if getattr(sys, 'frozen', False) and os.name == "nt":
+    APP_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home().as_posix())) / "检测数据统计工具"
+else:
+    APP_DIR = Path(__file__).parent
 LOG_DIR = APP_DIR / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE_PATH = LOG_DIR / "batch_count.log"
