@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%236e45e2'/><rect x='5' y='18' width='4' height='9' rx='1' fill='white'/><rect x='11' y='12' width='4' height='15' rx='1' fill='white'/><rect x='17' y='8' width='4' height='19' rx='1' fill='white'/><rect x='23' y='14' width='4' height='13' rx='1' fill='white'/></svg>">
+<title>检测数据统计工具 v3.0.2</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+  /* ===================== 全局重置 ===================== */
+  *, *::before, *::after {
+    margin: 0; padding: 0; box-sizing: border-box;
+  }
+
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-hover: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-dim: #6e7681;
+    --purple-start: #6e45e2;
+    --purple-end: #88d3ce;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 15px rgba(0,0,0,0.35);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --transition: 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+
+  body {
+    font-family: 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ===================== 侧边栏 ===================== */
+  .sidebar {
+    width: 200px;
+    min-width: 200px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    padding: 24px 16px;
+    gap: 10px;
+  }
+
+  .sidebar-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+    padding-left: 4px;
+  }
+
+  .sidebar-brand {
+    font-size: 15px;
+    font-weight: 700;
+    color: #88d3ce;
+    padding: 8px 12px;
+    margin-bottom: 12px;
+    background: rgba(110,69,226,0.12);
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(110,69,226,0.2);
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .sidebar-brand .logo-icon {
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+
+  .sidebar-brand span {
+    color: #88d3ce;
+    font-weight: 700;
+  }
+
+  /* ===================== 按钮 ===================== */
+  .galaxy-btn {
+    position: relative;
+    width: 100%;
+    padding: 11px 16px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform var(--transition), box-shadow var(--transition);
+    box-shadow: var(--shadow-sm);
+    letter-spacing: 0.02em;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .galaxy-btn .btn-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .galaxy-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .galaxy-btn:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  .galaxy-btn.primary { background: #6e45e2; }
+  .galaxy-btn.success { background: #11998e; }
+  .galaxy-btn.info    { background: #2b5876; }
+  .galaxy-btn.danger  { background: #eb3349; }
+  .galaxy-btn.warning { background: #f2994a; }
+
+  .galaxy-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* ===================== 主区域 ===================== */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 20px;
+    gap: 16px;
+  }
+
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .header-btn {
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all var(--transition);
+  }
+
+  .header-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--text-dim);
+  }
+
+  /* ===================== 文件列表面板 ===================== */
+  .file-panel {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    max-height: 180px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .panel-title .count {
+    background: var(--border);
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .file-list {
+    list-style: none;
+    overflow-y: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .file-list::-webkit-scrollbar { width: 4px; }
+  .file-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .file-item {
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition);
+    font-size: 13px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+
+  .file-item.active {
+    background: rgba(110,69,226,0.15);
+    color: #88d3ce;
+    font-weight: 600;
+    border: 1px solid rgba(110,69,226,0.25);
+  }
+
+  .file-item .file-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .empty-state {
+    color: var(--text-dim);
+    font-size: 13px;
+    text-align: center;
+    padding: 20px;
+  }
+
+  /* ===================== 结果面板 ===================== */
+  .result-panel {
+    flex: 1;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .result-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .table-wrapper {
+    flex: 1;
+    overflow: auto;
+  }
+
+  .table-wrapper::-webkit-scrollbar { width: 6px; height: 6px; }
+  .table-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .table-wrapper::-webkit-scrollbar-track { background: transparent; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  thead th {
+    background: var(--bg-secondary);
+    padding: 10px 14px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 8px 14px;
+    text-align: center;
+    border-bottom: 1px solid rgba(48,54,61,0.4);
+    color: var(--text-primary);
+  }
+
+  tbody tr:hover {
+    background: rgba(110,69,226,0.06);
+  }
+
+  tbody tr:nth-child(even) {
+    background: rgba(255,255,255,0.015);
+  }
+
+  tbody tr:nth-child(even):hover {
+    background: rgba(110,69,226,0.08);
+  }
+
+  .row-total {
+    font-weight: 700;
+    background: rgba(110,69,226,0.08) !important;
+    border-top: 2px solid rgba(110,69,226,0.3) !important;
+  }
+
+  .row-total td {
+    font-weight: 700;
+    color: #88d3ce;
+  }
+
+  .col-date {
+    font-weight: 600;
+    color: #a0a8c0;
+    min-width: 100px;
+  }
+
+  /* ===================== 状态栏 ===================== */
+  .status-bar {
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #38ef7d;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+
+  .status-dot.busy { background: #f2c94c; animation: pulse 0.8s infinite; }
+  .status-dot.error { background: #f45c43; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* ===================== 弹窗 Modal ===================== */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    animation: modalIn 0.25s ease;
+  }
+
+  @keyframes modalIn {
+    from { transform: scale(0.95) translateY(10px); opacity: 0; }
+    to { transform: scale(1) translateY(0); opacity: 1; }
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-header h3 { font-size: 16px; font-weight: 700; }
+
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition);
+    line-height: 1;
+  }
+
+  .modal-close:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+  .modal-body {
+    overflow-y: auto;
+    flex: 1;
+    font-size: 12px;
+    font-family: 'Consolas', 'Courier New', 'Microsoft YaHei UI', monospace;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  .modal-body::-webkit-scrollbar { width: 4px; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .about-info {
+    font-size: 14px;
+    line-height: 2;
+    color: var(--text-primary);
+  }
+
+  .about-info b { color: #88d3ce; }
+
+  /* ===================== Toast 通知 ===================== */
+  .toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .toast {
+    padding: 12px 20px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    font-weight: 500;
+    color: #fff;
+    box-shadow: var(--shadow-md);
+    animation: toastIn 0.3s ease;
+    max-width: 360px;
+    word-break: break-word;
+  }
+
+  .toast.success { background: #11998e; }
+  .toast.error   { background: #eb3349; }
+  .toast.info    { background: #2b5876; }
+
+  @keyframes toastIn {
+    from { transform: translateX(100px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* ===================== 浅色主题 ===================== */
+  body.light {
+    --bg-primary: #f6f8fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #f0f2f5;
+    --border: #d0d7de;
+    --text-primary: #1f2328;
+    --text-secondary: #656d76;
+    --text-dim: #8b949e;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 15px rgba(0,0,0,0.1);
+    --shadow-lg: 0 8px 30px rgba(0,0,0,0.12);
+  }
+
+  body.light thead th { background: #ffffff; }
+  body.light tbody tr:nth-child(even) { background: rgba(0,0,0,0.02); }
+  body.light tbody tr:nth-child(even):hover { background: rgba(110,69,226,0.04); }
+  body.light .row-total { background: rgba(110,69,226,0.04) !important; }
+  body.light .file-item.active {
+    background: rgba(110,69,226,0.06);
+    color: #6e45e2;
+    border: 1px solid rgba(110,69,226,0.2);
+  }
+  body.light .header-btn { background: #f6f8fa; }
+  body.light .header-btn:hover { background: #e8eaed; }
+  body.light .sidebar-brand {
+    background: rgba(110,69,226,0.06);
+    border: 1px solid rgba(110,69,226,0.12);
+    color: #6e45e2;
+  }
+  body.light .sidebar-brand span { color: #6e45e2; }
+
+  .theme-toggle {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all var(--transition);
+    color: var(--text-secondary);
+    line-height: 1;
+  }
+
+  .theme-toggle:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+  /* ===================== 确认弹窗 ===================== */
+  .confirm-modal .modal-box { max-width: 420px; text-align: center; }
+  .confirm-modal .confirm-icon { font-size: 48px; margin-bottom: 8px; line-height: 1; }
+  .confirm-modal .confirm-msg {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+    line-height: 1.6;
+  }
+
+  .confirm-actions { display: flex; gap: 12px; justify-content: center; }
+
+  .confirm-btn {
+    padding: 9px 28px;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition);
+    min-width: 90px;
+  }
+
+  .confirm-btn.ok { background: #11998e; color: #fff; }
+  .confirm-btn.ok:hover { box-shadow: 0 2px 10px rgba(17, 153, 142, 0.35); transform: translateY(-1px); }
+  .confirm-btn.cancel {
+    background: var(--bg-hover);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .confirm-btn.cancel:hover { background: var(--border); color: var(--text-primary); }
+
+  /* ===================== 进度条 ===================== */
+  .progress-modal .modal-box { max-width: 500px; }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .progress-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
+  .progress-percent { font-size: 14px; color: var(--text-secondary); }
+
+  .progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6e45e2, #88d3ce);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+
+  .progress-fill.indeterminate {
+    width: 30%;
+    animation: progressIndeterminate 1.5s ease-in-out infinite;
+  }
+
+  @keyframes progressIndeterminate {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+
+  .progress-text {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .progress-cancel-btn {
+    align-self: center;
+    padding: 8px 24px;
+    background: var(--bg-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    transition: all var(--transition);
+  }
+
+  .progress-cancel-btn:hover { background: var(--border); color: var(--text-primary); }
+
+  /* ===================== 响应式 ===================== */
+  @media (max-width: 600px) {
+    .sidebar { width: 56px; min-width: 56px; padding: 16px 6px; }
+    .galaxy-btn { font-size: 0; justify-content: center; padding: 10px; }
+    .galaxy-btn .btn-icon { margin: 0; }
+    .sidebar-title, .sidebar-brand { display: none; }
+  }
+</style>
+</head>
+<body class="light">
+
+  <!-- ========== 隐藏文件选择器 ========== -->
+  <input type="file" id="file-input" accept=".xlsx" multiple style="display:none;">
+  <!-- 文件夹选择器（webkitdirectory 兼容方案，作为 FS Access API 的 fallback） -->
+  <input type="file" id="folder-input" accept=".xlsx" multiple webkitdirectory style="display:none;">
+
+  <!-- ========== 侧边栏 ========== -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <span class="logo-icon">&#128202;</span><span>检测数据统计</span>
+    </div>
+    <div class="sidebar-title">操作</div>
+    <button class="galaxy-btn primary" onclick="importFiles()">
+      <span class="btn-icon">&#128194;</span> 导入文件
+    </button>
+    <button class="galaxy-btn primary" onclick="importFolder()" style="margin-top:6px;" title="多文件夹导入：可连续选择多个文件夹，自动递归扫描所有 .xlsx（含子文件夹），完成后统一导入">
+      <span class="btn-icon">&#128193;</span> 导入文件夹
+    </button>
+    <button class="galaxy-btn success" onclick="batchExport()">
+      <span class="btn-icon">&#128190;</span> 批量导出
+    </button>
+    <button class="galaxy-btn info" onclick="downloadMerged()">
+      <span class="btn-icon">&#128229;</span> 下载合并结果
+    </button>
+    <button class="galaxy-btn danger" onclick="clearAll()">
+      <span class="btn-icon">&#128465;</span> 清空列表
+    </button>
+  </aside>
+
+  <!-- ========== 主区域 ========== -->
+  <div class="main">
+    <div class="header">
+      <h1>检测数据统计工具 v3.0.2</h1>
+      <div class="header-actions">
+        <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="theme-btn">&#9788;</button>
+        <button class="header-btn" onclick="showAbout()">关于</button>
+        <button class="header-btn" onclick="showLog()">处理日志</button>
+      </div>
+    </div>
+
+    <div class="file-panel">
+      <div class="panel-title">
+        &#128196; 已导入文件 <span class="count" id="file-count">0</span>
+      </div>
+      <ul class="file-list" id="file-list">
+        <li class="empty-state">暂无文件，请点击左侧「导入文件」或拖拽 .xlsx 到窗口</li>
+      </ul>
+    </div>
+
+    <div class="result-panel">
+      <div class="result-header">
+        &#128202; 统计结果预览 <span id="view-mode" style="font-weight:400;color:var(--text-dim);font-size:11px;">— 全部文件</span>
+      </div>
+      <div class="table-wrapper">
+        <table id="result-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="status-bar">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">就绪 — 纯前端版，可直接打开 HTML 使用</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 确认弹窗 ========== -->
+  <div class="modal-overlay confirm-modal" id="confirm-modal">
+    <div class="modal-box">
+      <div class="confirm-icon">&#128204;</div>
+      <div class="confirm-msg" id="confirm-msg">确认操作？</div>
+      <div class="confirm-actions">
+        <button class="confirm-btn ok" id="confirm-ok" onclick="confirmAction(true)">确定</button>
+        <button class="confirm-btn cancel" onclick="confirmAction(false)">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 进度弹窗 ========== -->
+  <div class="modal-overlay progress-modal" id="progress-modal">
+    <div class="modal-box">
+      <div class="progress-header">
+        <div class="progress-title" id="progress-title">处理中...</div>
+        <div class="progress-percent" id="progress-percent">0%</div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill indeterminate" id="progress-fill"></div>
+      </div>
+      <div class="progress-text" id="progress-text"></div>
+      <button class="progress-cancel-btn" onclick="cancelProgress()">取消</button>
+    </div>
+  </div>
+
+  <!-- ========== Toast 容器 ========== -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ========== 日志弹窗 ========== -->
+  <div class="modal-overlay" id="log-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>&#128220; 处理日志</h3>
+        <div style="display:flex;gap:8px;">
+          <button class="header-btn" onclick="refreshLog()">刷新</button>
+          <button class="modal-close" onclick="closeModal('log-modal')">&times;</button>
+        </div>
+      </div>
+      <div class="modal-body" id="log-content"></div>
+    </div>
+  </div>
+
+  <!-- ========== 关于弹窗 ========== -->
+  <div class="modal-overlay" id="about-modal">
+    <div class="modal-box" style="max-width:420px;">
+      <div class="modal-header">
+        <h3>&#8505; 关于</h3>
+        <button class="modal-close" onclick="closeModal('about-modal')">&times;</button>
+      </div>
+      <div class="about-info">
+        版本: <b>v3.0.2</b> (独立 HTML 版)<br>
+        作者: <b>HotLL</b><br>
+        技术: 纯前端 JavaScript + SheetJS<br><br>
+        基于检测数据统计工具 v2.2.10 核心逻辑<br>
+        完全双版本移植，无需 Python 后端<br>
+        直接在浏览器中打开即可使用
+      </div>
+    </div>
+  </div>
+
+<script>
+// ===================================================================
+//  核心引擎 — 完整移植 v2.2.10 Python 逻辑到 JavaScript
+// ===================================================================
+
+const VERSION = "3.0.2";
+const DATE_COL = "日期";
+const BATCH_COL = "批号";
+const SKIP_ROWS = 2;
+const BATCH_EXAMPLE_PREFIXES = ["例", "示例", "sample"];
+
+// 运行日志（内存中保留最近 200 条）
+const _logs = [];
+function _log(level, msg) {
+  const ts = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const line = ts + " - " + level + " - " + msg;
+  _logs.push(line);
+  if (_logs.length > 200) _logs.shift();
+}
+
+// ===================== ensureDateStr =====================
+function ensureDateStr(val) {
+  // 对齐 v2.2.10 _ensure_date_str
+  if (val === null || val === undefined) return "";
+
+  // 字符串处理
+  if (typeof val === "string") {
+    val = val.trim();
+    if (val === "") return "";
+  }
+
+  // YYYYMMDD 格式（含 "20250801.0" → 8位整数）
+  if (typeof val !== "object") {
+    var s = String(val).trim();
+    if (s.indexOf(".") !== -1) s = s.split(".")[0];
+    if (/^\d{8}$/.test(s)) {
+      var y = parseInt(s.slice(0, 4), 10);
+      var m = parseInt(s.slice(4, 6), 10);
+      var d = parseInt(s.slice(6, 8), 10);
+      if (y >= 1900 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+        return y + "-" + String(m).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+      }
+    }
+  }
+
+  // SheetJS 日期对象
+  if (val instanceof Date && !isNaN(val.getTime())) {
+    var yr = val.getFullYear();
+    if (yr === 1970) {
+      var t = val.getTime();
+      if (Math.abs(t) < 86400000) return "";  // 1970-01-01 ± 1 day = epoch junk
+    }
+    if (yr >= 1900 && yr <= 2100) {
+      return yr + "-" + String(val.getMonth() + 1).padStart(2, "0") + "-" + String(val.getDate()).padStart(2, "0");
+    }
+    return "";
+  }
+
+  // 数字 → 尝试 Excel 序列号 (1900 日期系统)
+  // 仅处理 >= 30000 的值（对应 ~1982 年），避免将小数值（如测量值 12.5）误判为日期
+  if (typeof val === "number" && !isNaN(val) && isFinite(val)) {
+    if (val >= 30000) {
+      // Excel serial date: days since 1899-12-30
+      // JavaScript: ms since 1970-01-01
+      var excelEpoch = new Date(1899, 11, 30);
+      var jsDate = new Date(excelEpoch.getTime() + val * 86400000);
+      var yr2 = jsDate.getFullYear();
+      if (yr2 === 1970) return "";  // bad conversion
+      if (yr2 >= 1900 && yr2 <= 2100) {
+        return yr2 + "-" + String(jsDate.getMonth() + 1).padStart(2, "0") + "-" + String(jsDate.getDate()).padStart(2, "0");
+      }
+    }
+    return "";
+  }
+
+  // 最后尝试 new Date 解析字符串
+  if (typeof val === "string") {
+    var d2 = new Date(val);
+    if (!isNaN(d2.getTime())) {
+      var yr3 = d2.getFullYear();
+      if (yr3 >= 1900 && yr3 <= 2100) {
+        return yr3 + "-" + String(d2.getMonth() + 1).padStart(2, "0") + "-" + String(d2.getDate()).padStart(2, "0");
+      }
+    }
+  }
+
+  return "";
+}
+
+// ===================== detectDataStartRow =====================
+function detectDataStartRow(rows, maxScan) {
+  // rows = 2D array (SheetJS aoa)
+  // 分两阶段扫描：优先在左侧列（0-4）中查找实际数据日期，
+  // 避免右侧元数据日期（如试剂配置日期）触发误判
+  maxScan = maxScan || 50;
+  var nrows = Math.min(maxScan, rows.length);
+
+  // Phase 1: 仅扫描前 5 列（数据日期通常在最左列）
+  for (var ri = 0; ri < nrows; ri++) {
+    var row = rows[ri] || [];
+    var ncols = Math.min(row.length, 5);
+    for (var ci = 0; ci < ncols; ci++) {
+      var ds = ensureDateStr(row[ci]);
+      if (ds && /^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+        _log("DEBUG", "检测到数据起始行: 第 " + (ri + 1) + " 行 (第 " + (ci + 1) + " 列)");
+        return ri;
+      }
+    }
+  }
+
+  // Phase 2: fallback — 扫描全部列（处理左侧无日期的罕见情况）
+  for (var ri = 0; ri < nrows; ri++) {
+    var row = rows[ri] || [];
+    var ncols = Math.min(row.length, 30);
+    for (var ci = 5; ci < ncols; ci++) {
+      var ds = ensureDateStr(row[ci]);
+      if (ds && /^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+        _log("DEBUG", "检测到数据起始行(fallback): 第 " + (ri + 1) + " 行 (第 " + (ci + 1) + " 列)");
+        return ri;
+      }
+    }
+  }
+
+  _log("DEBUG", "未检测到有效日期，使用默认跳过 " + SKIP_ROWS + " 行");
+  return SKIP_ROWS;
+}
+
+// ===================== detectColumns =====================
+function detectColumns(headerRows, maxHeaderRows) {
+  // headerRows = 2D array, only header area rows
+  // 扫描全部 header 行（从底部向上），确保不遗漏顶部行中的关键词（如"批号"）
+  maxHeaderRows = maxHeaderRows || 3;
+  var dateKeywords = [
+    "日期", "date", "时间", "time",
+    "检测日期", "采样日期", "报告日期", "分析日期", "送检日期", "检验日期"
+  ];
+  var batchKeywords = [
+    "批号", "batch", "lot",
+    "编号", "序号",
+    "样品批号", "样品编号", "样品号", "样品名称",
+    "实验编号", "样本号",
+    "code", "id"
+  ];
+
+  var dateCol = 0;
+  var batchCol = 1;
+  var dateFound = false;
+  var batchFound = false;
+
+  if (!headerRows || headerRows.length === 0) return [dateCol, batchCol];
+
+  // 优先扫描底部 row（最靠近数据），找不到则向上扩展到全部 header 行
+  var start = Math.max(0, headerRows.length - maxHeaderRows);
+  for (var ri = headerRows.length - 1; ri >= start; ri--) {
+    var row = headerRows[ri] || [];
+    var ncols = Math.min(row.length, 30);
+    for (var ci = 0; ci < ncols; ci++) {
+      try {
+        var val = String(row[ci] || "").trim().toLowerCase();
+      } catch(e) { continue; }
+      if (!val) continue;
+      if (!dateFound) {
+        for (var dk = 0; dk < dateKeywords.length; dk++) {
+          if (val.indexOf(dateKeywords[dk]) !== -1) {
+            dateCol = ci;
+            dateFound = true;
+            break;
+          }
+        }
+      }
+      if (!batchFound) {
+        for (var bk = 0; bk < batchKeywords.length; bk++) {
+          if (val.indexOf(batchKeywords[bk]) !== -1) {
+            batchCol = ci;
+            batchFound = true;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Phase 2: 如果底部行未找到全部关键词，扫描顶部 header 行
+  if (!dateFound || !batchFound) {
+    for (var ri = start - 1; ri >= 0; ri--) {
+      var row = headerRows[ri] || [];
+      var ncols = Math.min(row.length, 30);
+      for (var ci = 0; ci < ncols; ci++) {
+        try {
+          var val = String(row[ci] || "").trim().toLowerCase();
+        } catch(e) { continue; }
+        if (!val) continue;
+        if (!dateFound) {
+          for (var dk = 0; dk < dateKeywords.length; dk++) {
+            if (val.indexOf(dateKeywords[dk]) !== -1) {
+              dateCol = ci;
+              dateFound = true;
+              break;
+            }
+          }
+        }
+        if (!batchFound) {
+          for (var bk = 0; bk < batchKeywords.length; bk++) {
+            if (val.indexOf(batchKeywords[bk]) !== -1) {
+              batchCol = ci;
+              batchFound = true;
+              break;
+            }
+          }
+        }
+      }
+      if (dateFound && batchFound) break;
+    }
+  }
+
+  if (dateFound || batchFound) {
+    _log("DEBUG", "自动识别列: 日期=第" + (dateCol + 1) + "列, 批号=第" + (batchCol + 1) + "列 (匹配关键词)");
+  }
+  return [dateCol, batchCol];
+}
+
+// ===================== readSheetData =====================
+function readSheetData(rows, sheetName) {
+  // rows = SheetJS aoa (array of arrays)
+  // Returns processed rows as [{date, batch}, ...] or null
+  if (!rows || rows.length === 0) return null;
+  if (rows[0].length < 2) return null;
+
+  var autoSkip = detectDataStartRow(rows);
+
+  // Extract header area
+  var headerRows = autoSkip > 0 ? rows.slice(0, autoSkip) : [];
+  var cols = detectColumns(headerRows);
+  var dateCol = cols[0];
+  var batchCol = cols[1];
+
+  // Slice data rows
+  var dataRows = autoSkip > 0 ? rows.slice(autoSkip) : rows;
+  if (dataRows.length === 0) return null;
+
+  _log("INFO", " " + sheetName + ": 自动跳过前 " + autoSkip + " 行表头");
+
+  // Build result: [{date: "YYYY-MM-DD", batch: "batch_str"}, ...]
+  var result = [];
+  for (var i = 0; i < dataRows.length; i++) {
+    var row = dataRows[i];
+    var dateStr = ensureDateStr(row[dateCol] !== undefined ? row[dateCol] : null);
+    var batchRaw = row[batchCol];
+    var batchStr = "";
+    if (batchRaw !== null && batchRaw !== undefined) {
+      batchStr = String(batchRaw).trim();
+    }
+    result.push({ date: dateStr, batch: batchStr });
+  }
+
+  // Forward fill dates (merged cells scenario)
+  var lastDate = "";
+  for (var j = 0; j < result.length; j++) {
+    if (result[j].date === "" || result[j].date === null) {
+      result[j].date = lastDate;
+    } else {
+      lastDate = result[j].date;
+    }
+  }
+
+  // Filter: keep only rows with valid YYYY-MM-DD dates
+  result = result.filter(function(r) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(r.date);
+  });
+
+  // Filter: exclude example/template rows
+  result = result.filter(function(r) {
+    var b = r.batch.toLowerCase();
+    for (var p = 0; p < BATCH_EXAMPLE_PREFIXES.length; p++) {
+      if (b.indexOf(BATCH_EXAMPLE_PREFIXES[p]) === 0) return false;
+    }
+    return true;
+  });
+
+  // Filter: exclude rows with empty batch (merged cell continuation rows)
+  result = result.filter(function(r) {
+    return r.batch !== "";
+  });
+
+  if (result.length === 0) return null;
+  return result;
+}
+
+// ===================== countDailyBatches =====================
+function countDailyBatches(rows) {
+  // rows = [{date, batch}, ...]
+  // Returns { "YYYY-MM-DD": count, ... }
+  var groups = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (!groups[r.date]) groups[r.date] = new Set();
+    groups[r.date].add(r.batch);
+  }
+  var result = {};
+  for (var date in groups) {
+    result[date] = groups[date].size;
+  }
+  return result;
+}
+
+// ===================== mergeDailyCounts =====================
+function mergeDailyCounts(countDict) {
+  // countDict = { sheetName: { date: count, ... }, ... }
+  // Returns { columns: ["日期", ...sheetNames, "合计"], rows: [[date, ...counts, total], ...], totals: ["合计", ...colTotals, grandTotal] }
+  var allDates = new Set();
+  var sheetNames = Object.keys(countDict);
+  for (var sn = 0; sn < sheetNames.length; sn++) {
+    var dates = Object.keys(countDict[sheetNames[sn]]);
+    for (var d = 0; d < dates.length; d++) {
+      allDates.add(dates[d]);
+    }
+  }
+  if (allDates.size === 0) return null;
+
+  var sortedDates = Array.from(allDates).sort();
+  var columns = ["日期"].concat(sheetNames).concat(["合计"]);
+  var rows = [];
+  var colTotals = {};
+  sheetNames.forEach(function(sn) { colTotals[sn] = 0; });
+  var grandTotal = 0;
+
+  for (var di = 0; di < sortedDates.length; di++) {
+    var date = sortedDates[di];
+    var row = [date];
+    var rowTotal = 0;
+    for (var si = 0; si < sheetNames.length; si++) {
+      var cnt = countDict[sheetNames[si]][date] || 0;
+      // sheet 数据列：0 值用空字符（匹配 v2.2.10），但保留数值用于合计计算
+      row.push(cnt === 0 ? "" : cnt);
+      rowTotal += cnt;
+      colTotals[sheetNames[si]] += cnt;
+    }
+    row.push(rowTotal);
+    grandTotal += rowTotal;
+    rows.push(row);
+  }
+
+  var totalsRow = ["合计"];
+  var totalSum = 0;
+  for (var si2 = 0; si2 < sheetNames.length; si2++) {
+    var t = colTotals[sheetNames[si2]];
+    totalsRow.push(t);
+    totalSum += t;
+  }
+  totalsRow.push(totalSum);
+
+  return { columns: columns, rows: rows, totals: totalsRow };
+}
+
+// ===================== 导出辅助函数 =====================
+function columnToLetter(col) {
+  var letter = "";
+  while (col > 0) {
+    var mod = (col - 1) % 26;
+    letter = String.fromCharCode(65 + mod) + letter;
+    col = Math.floor((col - 1) / 26);
+  }
+  return letter;
+}
+
+function formatWorksheet(ws) {
+  var fontNormal = { name: "仿宋", size: 14 };
+  var fontBold = { name: "仿宋", size: 14, bold: true };
+  var thinBorder = { style: "thin" };
+  var border = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder };
+  var alignCenter = { horizontal: "center", vertical: "middle" };
+
+  var totalRowNum = ws.rowCount;
+
+  ws.eachRow({ includeEmpty: true }, function(row, rowNum) {
+    row.height = 35;
+    row.eachCell({ includeEmpty: true }, function(cell) {
+      cell.font = (rowNum === totalRowNum) ? fontBold : fontNormal;
+      cell.alignment = alignCenter;
+      cell.border = border;
+      // 数据行（非表头、非合计行）的 0 值替换为空
+      if (rowNum > 1 && rowNum < totalRowNum && cell.value === 0) {
+        cell.value = null;
+      }
+    });
+  });
+
+  // 自动列宽（中文字符宽度 * 2，最小 8，最大 30，与 v2.2.10 一致）
+  for (var ci = 1; ci <= ws.columnCount; ci++) {
+    var col = ws.getColumn(ci);
+    var maxLen = 0;
+    col.eachCell({ includeEmpty: true }, function(cell) {
+      var val = "";
+      if (cell.value !== null && cell.value !== undefined) {
+        if (typeof cell.value === "object" && cell.value !== null && (cell.value.formula || cell.value.sharedFormula)) {
+          val = cell.value.formula || cell.value.sharedFormula || "";
+        } else {
+          val = String(cell.value);
+        }
+      }
+      var len = 0;
+      for (var i = 0; i < val.length; i++) {
+        len += val.charCodeAt(i) > 127 ? 2 : 1;
+      }
+      maxLen = Math.max(maxLen, len + 2);
+    });
+    col.width = Math.max(Math.min(maxLen + 2, 30), 8);
+  }
+}
+
+// ===================== buildExportWorkbook =====================
+// 按照 v2.2.10 格式生成双 sheet 工作簿（使用 ExcelJS）：
+//   - 字体：仿宋 14pt，合计行加粗
+//   - 边框：细线；对齐：居中
+//   - 合计行：SUM 公式（非纯数值）
+//   Sheet "每日批号统计": 所有 sheet 的每日明细 + 合计列 + 合计行（SUM 公式）
+//   Sheet "每日汇总":     仅日期 + 合计列 + 合计行（SUM 公式）
+// countDict = { sheetName: { date: count, ... }, ... }
+async function buildExportWorkbook(countDict) {
+  var merged = mergeDailyCounts(countDict);
+  if (!merged || !merged.columns) return null;
+
+  var wb = new ExcelJS.Workbook();
+
+  // ---- Sheet 1: 每日批号统计 ----
+  var wsDetail = wb.addWorksheet("每日批号统计");
+
+  // 表头行
+  wsDetail.addRow(merged.columns);
+
+  // 数据行（合计列保持数值，其他列为 0 时置空 — 与 v2.2.10 replace(0, None) 一致）
+  merged.rows.forEach(function(r) {
+    var dataRow = [];
+    r.forEach(function(cell, ci) {
+      if (ci === 0) {
+        dataRow.push(cell);           // 日期保持原样
+      } else if (ci === r.length - 1) {
+        dataRow.push(cell);           // 合计列保持数值
+      } else {
+        dataRow.push(cell === 0 ? null : cell);  // sheet 列：0 值置空
+      }
+    });
+    wsDetail.addRow(dataRow);
+  });
+
+  // 合计行 — SUM 公式（与 v2.2.10 一致）
+  var detailStartRow = 2;          // Excel 行号：第1行是表头
+  var detailEndRow = merged.rows.length + 1;
+  var detailTotalRowNum = detailEndRow + 1;
+  var detailTotalRow = wsDetail.addRow([]);
+  detailTotalRow.getCell(1).value = "合计";
+  for (var ci = 1; ci < merged.columns.length; ci++) {
+    var colLetter = columnToLetter(ci + 1);
+    var formula = "SUM(" + colLetter + detailStartRow + ":" + colLetter + detailEndRow + ")";
+    detailTotalRow.getCell(ci + 1).value = { formula: formula };
+  }
+
+  formatWorksheet(wsDetail);
+
+  // ---- Sheet 2: 每日汇总 ----
+  var wsSummary = wb.addWorksheet("每日汇总");
+  wsSummary.addRow(["日期", "合计"]);
+
+  merged.rows.forEach(function(r) {
+    var rowTotal = r[r.length - 1];
+    wsSummary.addRow([r[0], rowTotal === 0 ? null : rowTotal]);
+  });
+
+  var summaryStartRow = 2;
+  var summaryEndRow = merged.rows.length + 1;
+  var summaryTotalRow = wsSummary.addRow([]);
+  summaryTotalRow.getCell(1).value = "合计";
+  summaryTotalRow.getCell(2).value = { formula: "SUM(B" + summaryStartRow + ":B" + summaryEndRow + ")" };
+
+  formatWorksheet(wsSummary);
+
+  return wb;
+}
+
+// ===================================================================
+//  全局状态
+// ===================================================================
+var fileList = [];              // [{name, workbook, sheetCounts}]
+var selectedFileIndex = -1;
+var mergedResult = null;       // merged count dict
+var isProcessing = false;
+var cancelRequested = false;
+
+// ===================================================================
+//  UI 工具函数
+// ===================================================================
+function $(id) { return document.getElementById(id); }
+
+function setStatus(msg, type) {
+  $("status-text").textContent = msg;
+  var dot = $("status-dot");
+  dot.className = "status-dot";
+  if (type === "busy") dot.classList.add("busy");
+  if (type === "error") dot.classList.add("error");
+}
+
+function showToast(msg, type) {
+  var container = $("toast-container");
+  var toast = document.createElement("div");
+  toast.className = "toast " + (type || "info");
+  toast.textContent = msg;
+  container.appendChild(toast);
+  setTimeout(function() { toast.remove(); }, 3500);
+}
+
+function closeModal(id) { $(id).classList.remove("active"); }
+function openModal(id) { $(id).classList.add("active"); }
+
+function updateFileList() {
+  var ul = $("file-list");
+  var count = $("file-count");
+  count.textContent = fileList.length;
+  if (fileList.length === 0) {
+    ul.innerHTML = '<li class="empty-state">暂无文件，请点击左侧「导入文件」或拖拽 .xlsx 到窗口</li>';
+    selectedFileIndex = -1;
+    return;
+  }
+  var html = "";
+  fileList.forEach(function(f, i) {
+    var cls = (i === selectedFileIndex) ? "file-item active" : "file-item";
+    html += '<li class="' + cls + '" onclick="selectFile(' + i + ')" title="' + f.name + '">' +
+      '<span class="file-icon">&#128203;</span> ' + f.name + '</li>';
+  });
+  ul.innerHTML = html;
+}
+
+function renderTable(data) {
+  var thead = $("result-table").querySelector("thead");
+  var tbody = $("result-table").querySelector("tbody");
+  var modeLabel = $("view-mode");
+  if (!data || !data.columns || data.columns.length === 0) {
+    thead.innerHTML = "";
+    tbody.innerHTML = '<tr><td colspan="10" style="padding:40px;color:var(--text-dim);">暂无统计数据</td></tr>';
+    modeLabel.textContent = "— 无数据";
+    return;
+  }
+  thead.innerHTML = "<tr>" + data.columns.map(function(c) { return "<th>" + c + "</th>"; }).join("") + "</tr>";
+  var bodyHtml = "";
+  (data.rows || []).forEach(function(row) {
+    bodyHtml += "<tr>";
+    row.forEach(function(cell, ci) {
+      var cn = ci === 0 ? "col-date" : "";
+      bodyHtml += '<td class="' + cn + '">' + (cell !== null && cell !== undefined ? cell : "") + "</td>";
+    });
+    bodyHtml += "</tr>";
+  });
+  if (data.totals && data.totals.length > 0) {
+    bodyHtml += '<tr class="row-total">';
+    data.totals.forEach(function(cell, ci) {
+      var cn = ci === 0 ? "col-date" : "";
+      bodyHtml += '<td class="' + cn + '">' + (cell !== null && cell !== undefined ? cell : "") + "</td>";
+    });
+    bodyHtml += "</tr>";
+  }
+  tbody.innerHTML = bodyHtml;
+  if (data.mode) modeLabel.textContent = "— " + data.mode;
+  else modeLabel.textContent = "— 全部文件";
+}
+
+// ===================================================================
+//  进度控制
+// ===================================================================
+function updateProgress(percent, title, text) {
+  var fill = $("progress-fill");
+  if (percent >= 0) {
+    fill.classList.remove("indeterminate");
+    fill.style.width = percent + "%";
+  } else {
+    fill.classList.add("indeterminate");
+    fill.style.width = "";
+  }
+  $("progress-percent").textContent = percent >= 0 ? percent + "%" : "处理中...";
+  if (title) $("progress-title").textContent = title;
+  if (text) $("progress-text").textContent = text;
+}
+
+function showProgress(title) {
+  isProcessing = true;
+  cancelRequested = false;
+  updateProgress(-1, title, "");
+  openModal("progress-modal");
+}
+
+function hideProgress() {
+  isProcessing = false;
+  closeModal("progress-modal");
+}
+
+function cancelProgress() {
+  cancelRequested = true;
+  hideProgress();
+  setStatus("用户取消操作", "error");
+}
+
+// ===================================================================
+//  核心处理流程
+// ===================================================================
+function processFiles(fileObjs) {
+  // fileObjs = FileList or File[]
+  if (!fileObjs || fileObjs.length === 0) return;
+
+  // 去重：过滤掉已导入的同名文件（与 v2.2.10 行为一致）
+  var existingNames = {};
+  fileList.forEach(function(f) { existingNames[f.name] = true; });
+  var dedupedFiles = [];
+  var skipped = 0;
+  for (var i = 0; i < fileObjs.length; i++) {
+    if (existingNames[fileObjs[i].name]) {
+      skipped++;
+      _log("INFO", "跳过重复文件: " + fileObjs[i].name);
+    } else {
+      dedupedFiles.push(fileObjs[i]);
+      existingNames[fileObjs[i].name] = true;
+    }
+  }
+  if (skipped > 0) {
+    showToast("已跳过 " + skipped + " 个重复文件", "info");
+  }
+  if (dedupedFiles.length === 0) {
+    showToast("所有文件已导入", "info");
+    return;
+  }
+  fileObjs = dedupedFiles;
+
+  showProgress("正在读取并处理文件...");
+  setStatus("处理中...", "busy");
+
+  var newFiles = [];
+  var processed = 0;
+  var total = fileObjs.length;
+
+  // Helper: process one file asynchronously
+  function processOne(idx) {
+    if (cancelRequested) {
+      hideProgress();
+      setStatus("用户取消操作", "error");
+      return;
+    }
+    if (idx >= total) {
+      // All done — merge and display
+      finishProcessing(newFiles);
+      return;
+    }
+
+    updateProgress(Math.round(processed / total * 100), "正在处理 " + fileObjs[idx].name);
+    $("progress-text").textContent = "文件 " + (idx + 1) + " / " + total;
+
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        var data = new Uint8Array(e.target.result);
+        var wb = XLSX.read(data, { type: "array", cellDates: true, cellFormula: false });
+        var fileEntry = {
+          name: fileObjs[idx].name,
+          workbook: wb,
+          sheetCounts: {}
+        };
+
+        wb.SheetNames.forEach(function(sn) {
+          if (sn === "目录") return;
+          var ws = wb.Sheets[sn];
+          // Convert to array-of-arrays (like header=None in pandas)
+          var rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: true });
+          var processedRows = readSheetData(rows, sn);
+          if (processedRows && processedRows.length > 0) {
+            var counts = countDailyBatches(processedRows);
+            fileEntry.sheetCounts[sn] = counts;
+            _log("INFO", "已处理 " + sn + ": " + processedRows.length + " 条记录, " + Object.keys(counts).length + " 个日期");
+          } else {
+            _log("INFO", "跳过 " + sn + "（无有效数据）");
+          }
+        });
+
+        _log("INFO", "文件 " + fileEntry.name + " 有效工作表: " + Object.keys(fileEntry.sheetCounts).join(", "));
+        if (Object.keys(fileEntry.sheetCounts).length > 0) {
+          newFiles.push(fileEntry);
+        } else {
+          showToast(fileEntry.name + " 未检测到有效数据", "info");
+        }
+
+        processed++;
+        // Next file (use setTimeout to keep UI responsive)
+        setTimeout(function() { processOne(idx + 1); }, 10);
+      } catch(err) {
+        _log("ERROR", "处理 " + fileObjs[idx].name + " 失败: " + err.message);
+        showToast(fileObjs[idx].name + " 处理失败: " + err.message, "error");
+        processed++;
+        setTimeout(function() { processOne(idx + 1); }, 10);
+      }
+    };
+    reader.onerror = function() {
+      showToast(fileObjs[idx].name + " 读取失败", "error");
+      processed++;
+      setTimeout(function() { processOne(idx + 1); }, 10);
+    };
+    reader.readAsArrayBuffer(fileObjs[idx]);
+  }
+
+  processOne(0);
+}
+
+function finishProcessing(newFiles) {
+  fileList = fileList.concat(newFiles);
+  updateFileList();
+
+  // Rebuild merged result
+  rebuildMerged();
+
+  hideProgress();
+  var msg = "成功导入 " + newFiles.length + " 个文件";
+  if (newFiles.length > 0) {
+    var totalBatches = 0;
+    newFiles.forEach(function(f) {
+      Object.keys(f.sheetCounts).forEach(function(sn) {
+        Object.keys(f.sheetCounts[sn]).forEach(function(d) {
+          totalBatches += f.sheetCounts[sn][d];
+        });
+      });
+    });
+    msg += "，共 " + totalBatches + " 批次";
+  }
+  showToast(msg, "success");
+  setStatus(msg);
+
+  // Render merged table
+  if (mergedResult) {
+    renderTable(mergedResult);
+    selectedFileIndex = -1;
+  }
+}
+
+function rebuildMerged() {
+  // Merge counts across all files, combining same-named sheets
+  var allSheetCounts = {};
+  fileList.forEach(function(f) {
+    Object.keys(f.sheetCounts).forEach(function(sn) {
+      if (!allSheetCounts[sn]) allSheetCounts[sn] = {};
+      var sc = f.sheetCounts[sn];
+      Object.keys(sc).forEach(function(date) {
+        allSheetCounts[sn][date] = (allSheetCounts[sn][date] || 0) + sc[date];
+      });
+    });
+  });
+
+  mergedResult = mergeDailyCounts(allSheetCounts);
+}
+
+// ===================================================================
+//  UI 操作
+// ===================================================================
+function importFiles() {
+  if (isProcessing) {
+    showToast("请等待当前操作完成", "info");
+    return;
+  }
+  var input = $("file-input");
+  input.value = "";
+  input.click();
+}
+
+$("file-input").addEventListener("change", function() {
+  if (this.files && this.files.length > 0) {
+    processFiles(this.files);
+  }
+});
+
+// Drag & drop support（支持拖入文件 + 拖入文件夹，递归扫描 .xlsx）
+document.addEventListener("dragover", function(e) { e.preventDefault(); });
+document.addEventListener("drop", function(e) {
+  e.preventDefault();
+  if (isProcessing) {
+    showToast("请等待当前操作完成", "info");
+    return;
+  }
+  var items = e.dataTransfer && e.dataTransfer.items;
+  if (items && items.length > 0) {
+    // 优先使用 DataTransferItem API，支持文件夹递归
+    var entries = [];
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      if (item.webkitGetAsEntry) {
+        var entry = item.webkitGetAsEntry();
+        if (entry) entries.push(entry);
+      }
+    }
+    if (entries.length > 0) {
+      setStatus("正在扫描拖入内容...", "busy");
+      collectXlsxFromEntries(entries, function(files) {
+        if (files.length > 0) {
+          processFiles(files);
+        } else {
+          showToast("未找到 .xlsx 文件（已递归扫描子文件夹）", "info");
+          setStatus("就绪");
+        }
+      });
+      return;
+    }
+  }
+  // fallback: 普通 File 对象（无文件夹支持）
+  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    var xlsxFiles = [];
+    for (var i = 0; i < e.dataTransfer.files.length; i++) {
+      var f = e.dataTransfer.files[i];
+      if (f.name.toLowerCase().endsWith(".xlsx")) xlsxFiles.push(f);
+    }
+    if (xlsxFiles.length > 0) {
+      processFiles(xlsxFiles);
+    } else {
+      showToast("请拖入 .xlsx 文件或文件夹", "info");
+    }
+  }
+});
+
+// ---- 递归遍历 FileSystemEntry，收集所有 .xlsx ----
+function collectXlsxFromEntries(entries, callback) {
+  var results = [];
+  var pending = 0;
+
+  function readEntry(entry) {
+    if (entry.isFile) {
+      if (entry.name.toLowerCase().endsWith(".xlsx") && !entry.name.startsWith("~$")) {
+        pending++;
+        entry.file(function(f) {
+          results.push(f);
+          pending--;
+          if (pending === 0) callback(results);
+        }, function() {
+          pending--;
+          if (pending === 0) callback(results);
+        });
+      }
+    } else if (entry.isDirectory) {
+      pending++;
+      var reader = entry.createReader();
+      var readBatch = function() {
+        reader.readEntries(function(batch) {
+          if (batch.length === 0) {
+            pending--;
+            if (pending === 0) callback(results);
+          } else {
+            batch.forEach(function(e) { readEntry(e); });
+            readBatch(); // 继续读（每批最多 100 条，需循环）
+          }
+        }, function() {
+          pending--;
+          if (pending === 0) callback(results);
+        });
+      };
+      readBatch();
+    }
+  }
+
+  if (entries.length === 0) { callback(results); return; }
+  entries.forEach(function(e) { readEntry(e); });
+}
+
+// ---- 多文件夹导入（循环选择 + 累积处理）----
+async function importFolder() {
+  if (isProcessing) {
+    showToast("请等待当前操作完成", "info");
+    return;
+  }
+
+  // 检查 API 可用性
+  if (!window.showDirectoryPicker && !document.getElementById("folder-input")) {
+    showToast("当前浏览器不支持文件夹导入", "info");
+    return;
+  }
+
+  var allFiles = [];          // 累积所有 .xlsx 文件
+  var folderNames = [];       // 记录已选文件夹名称（用于日志）
+  var totalScanned = 0;       // 总扫描文件数（含重复）
+  var round = 0;
+
+  while (true) {
+    round++;
+    var filesThisRound = [];
+
+    if (window.showDirectoryPicker) {
+      // 方案 A: File System Access API（Chrome/Edge）
+      try {
+        var dirHandle = await window.showDirectoryPicker({
+          mode: "read",
+          // 第二轮开始提示可继续添加
+          startIn: undefined
+        });
+        var dirName = dirHandle.name || ("文件夹" + round);
+        setStatus("正在扫描「" + dirName + "」...", "busy");
+        filesThisRound = await collectXlsxFromDirHandle(dirHandle);
+        folderNames.push(dirName);
+      } catch(err) {
+        if (err.name === "AbortError") {
+          // 用户取消选择
+          if (round === 1 && allFiles.length === 0) {
+            setStatus("就绪");
+            return; // 第一轮就取消，不做任何事
+          }
+          break; // 后续轮次取消，结束循环
+        }
+        _log("WARNING", "FS Access API 失败: " + err.message);
+        break;
+      }
+    } else {
+      // 方案 B: webkitdirectory fallback（Firefox 等）
+      var result = await pickFolderViaInput();
+      if (!result || result.files.length === 0) {
+        if (round === 1 && allFiles.length === 0) {
+          setStatus("就绪");
+          return;
+        }
+        break;
+      }
+      filesThisRound = result.files;
+      folderNames.push(result.folderName || ("文件夹" + round));
+    }
+
+    if (filesThisRound.length === 0) {
+      showToast("「" + (folderNames[folderNames.length - 1]) + "」内未找到 .xlsx 文件", "info");
+    } else {
+      allFiles = allFiles.concat(filesThisRound);
+      totalScanned += filesThisRound.length;
+    }
+
+    // 询问是否继续
+    var summary = "已添加 " + folderNames.length + " 个文件夹，共 " + allFiles.length + " 个文件";
+    setStatus(summary, "busy");
+    var keepGoing = confirm(summary + "。\n\n是否继续添加文件夹？");
+    if (!keepGoing) break;
+  }
+
+  if (allFiles.length === 0) {
+    setStatus("就绪");
+    showToast("未找到任何 .xlsx 文件", "info");
+    return;
+  }
+
+  _log("INFO", "多文件夹导入: " + folderNames.length + " 个文件夹 → " + allFiles.length + " 个文件");
+  showToast("从 " + folderNames.length + " 个文件夹中扫描到 " + allFiles.length + " 个文件，正在导入...", "info");
+  setStatus("正在导入 " + allFiles.length + " 个文件...", "busy");
+  processFiles(allFiles);
+}
+
+// webkitdirectory 的一次性选择（返回 Promise）
+function pickFolderViaInput() {
+  return new Promise(function(resolve) {
+    var input = document.getElementById("folder-input");
+    var handler = function() {
+      input.removeEventListener("change", handler);
+      if (input.files && input.files.length > 0) {
+        var xlsxFiles = [];
+        for (var i = 0; i < input.files.length; i++) {
+          var f = input.files[i];
+          if (f.name.toLowerCase().endsWith(".xlsx") && !f.name.startsWith("~$")) {
+            xlsxFiles.push(f);
+          }
+        }
+        // 尝试从第一个文件的 webkitRelativePath 推断文件夹名
+        var folderName = "";
+        if (input.files[0].webkitRelativePath) {
+          var parts = input.files[0].webkitRelativePath.split("/");
+          folderName = parts[0] || "";
+        }
+        resolve({ files: xlsxFiles, folderName: folderName });
+      } else {
+        resolve(null);
+      }
+    };
+    input.addEventListener("change", handler);
+    input.value = "";
+    input.click();
+  });
+}
+
+// FS Access API 递归收集 .xlsx
+async function collectXlsxFromDirHandle(dirHandle) {
+  var results = [];
+  for await (var [name, handle] of dirHandle.entries()) {
+    if (handle.kind === "file") {
+      if (name.toLowerCase().endsWith(".xlsx") && !name.startsWith("~$")) {
+        var file = await handle.getFile();
+        results.push(file);
+      }
+    } else if (handle.kind === "directory") {
+      var sub = await collectXlsxFromDirHandle(handle);
+      results = results.concat(sub);
+    }
+  }
+  return results;
+}
+
+function selectFile(index) {
+  if (isProcessing) return;
+  if (index === selectedFileIndex) {
+    selectedFileIndex = -1;
+  } else {
+    selectedFileIndex = index;
+  }
+  updateFileList();
+  showFileResult();
+}
+
+function showFileResult() {
+  if (selectedFileIndex < 0 || selectedFileIndex >= fileList.length) {
+    if (mergedResult) {
+      renderTable(mergedResult);
+      $("view-mode").textContent = "— 全部文件";
+    } else {
+      renderTable(null);
+    }
+    return;
+  }
+
+  var f = fileList[selectedFileIndex];
+  var result = mergeDailyCounts(f.sheetCounts);
+  if (result) {
+    result.mode = "单文件: " + f.name;
+    renderTable(result);
+    $("view-mode").textContent = "— " + f.name;
+    setStatus("查看: " + f.name);
+  } else {
+    renderTable(null);
+    setStatus(f.name + " — 无数据", "error");
+  }
+}
+
+function batchExport() {
+  if (fileList.length === 0) {
+    showToast("请先导入文件", "info");
+    return;
+  }
+  $("confirm-msg").textContent = "将为 " + fileList.length + " 个文件分别生成统计结果 Excel 并打包下载（ZIP），是否继续？";
+  openModal("confirm-modal");
+}
+
+function confirmAction(confirmed) {
+  closeModal("confirm-modal");
+  if (!confirmed) return;
+  doBatchExport();
+}
+
+async function doBatchExport() {
+  showProgress("正在生成导出文件...");
+  setStatus("导出中...", "busy");
+
+  try {
+    var zip = new JSZip();
+    var exported = 0;
+
+    for (var idx = 0; idx < fileList.length; idx++) {
+      if (cancelRequested) break;
+      var f = fileList[idx];
+      updateProgress(Math.round(idx / fileList.length * 100), "导出 " + f.name);
+
+      if (!f.sheetCounts || Object.keys(f.sheetCounts).length === 0) {
+        _log("WARNING", "导出跳过: " + f.name + " (无有效数据)");
+        continue;
+      }
+
+      var wb = await buildExportWorkbook(f.sheetCounts);
+      if (!wb) {
+        _log("WARNING", "导出失败: " + f.name + " (建表失败)");
+        continue;
+      }
+
+      var buf = await wb.xlsx.writeBuffer();
+      var baseName = f.name.replace(/\.xlsx$/i, "");
+      // 文件名格式: {原文件名}_统计结果.xlsx（与 v2.2.10 一致）
+      zip.file(baseName + "_统计结果.xlsx", buf);
+      exported++;
+    }
+
+    if (cancelRequested) {
+      hideProgress();
+      return;
+    }
+
+    if (exported === 0) {
+      hideProgress();
+      showToast("没有可导出的文件", "info");
+      return;
+    }
+
+    updateProgress(95, "写入 ZIP...");
+    var content = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } });
+    var url = URL.createObjectURL(content);
+    var a = document.createElement("a");
+    a.href = url;
+    var ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, "").replace("T", "_");
+    a.download = "检测数据统计结果_" + ts + ".zip";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    hideProgress();
+    showToast("导出完成！共 " + exported + " 个文件", "success");
+    setStatus("导出完成 (" + exported + " 个文件)");
+
+  } catch(e) {
+    hideProgress();
+    showToast("导出出错: " + e.message, "error");
+    setStatus("导出出错", "error");
+    _log("ERROR", "导出失败: " + e.message);
+  }
+}
+
+async function downloadMerged() {
+  if (fileList.length === 0) {
+    showToast("请先导入文件", "info");
+    return;
+  }
+
+  // 重建跨文件聚合的 sheet_counts（与 v2.2.10 _rebuild_sheet_counts_from_stats 一致）
+  var allSheetCounts = {};
+  fileList.forEach(function(f) {
+    Object.keys(f.sheetCounts).forEach(function(sn) {
+      if (!allSheetCounts[sn]) allSheetCounts[sn] = {};
+      var sc = f.sheetCounts[sn];
+      Object.keys(sc).forEach(function(date) {
+        allSheetCounts[sn][date] = (allSheetCounts[sn][date] || 0) + sc[date];
+      });
+    });
+  });
+
+  var wb = await buildExportWorkbook(allSheetCounts);
+  if (!wb) {
+    showToast("暂无统计数据", "info");
+    return;
+  }
+
+  setStatus("生成合并结果...", "busy");
+  try {
+    var buf = await wb.xlsx.writeBuffer();
+    var blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    // 文件名格式: 单文件时取 {原文件名}_统计结果.xlsx（与 v2.2.10 一致）
+    if (fileList.length === 1) {
+      a.download = fileList[0].name.replace(/\.xlsx$/i, "") + "_统计结果.xlsx";
+    } else {
+      var ts = new Date().toISOString().slice(0, 19).replace(/[:-]/g, "").replace("T", "_");
+      a.download = "检测数据统计_合并结果_" + ts + ".xlsx";
+    }
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast("下载完成！", "success");
+    setStatus("合并结果已下载");
+  } catch(e) {
+    showToast("下载失败: " + e.message, "error");
+    setStatus("下载失败", "error");
+  }
+}
+
+function clearAll() {
+  fileList = [];
+  mergedResult = null;
+  selectedFileIndex = -1;
+  _logs.length = 0;
+  updateFileList();
+  renderTable(null);
+  setStatus("已清空所有数据");
+  showToast("已清空", "success");
+}
+
+function showLog() {
+  openModal("log-modal");
+  refreshLog();
+}
+
+function refreshLog() {
+  $("log-content").textContent = _logs.join("\n") || "(暂无日志)";
+}
+
+function showAbout() {
+  openModal("about-modal");
+}
+
+// ===================================================================
+//  主题切换
+// ===================================================================
+function initTheme() {
+  var saved = localStorage.getItem("app-theme");
+  if (saved === "dark") {
+    document.body.classList.remove("light");
+    $("theme-btn").innerHTML = "&#9789;";
+  } else {
+    $("theme-btn").innerHTML = "&#9788;";
+  }
+}
+
+function toggleTheme() {
+  var body = document.body;
+  var btn = $("theme-btn");
+  body.classList.toggle("light");
+  if (body.classList.contains("light")) {
+    localStorage.setItem("app-theme", "light");
+    btn.innerHTML = "&#9788;";
+  } else {
+    localStorage.setItem("app-theme", "dark");
+    btn.innerHTML = "&#9789;";
+  }
+}
+
+// ===================================================================
+//  弹窗事件
+// ===================================================================
+document.querySelectorAll(".modal-overlay").forEach(function(overlay) {
+  overlay.addEventListener("click", function(e) {
+    if (e.target === overlay) closeModal(overlay.id);
+  });
+});
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") {
+    document.querySelectorAll(".modal-overlay.active").forEach(function(m) { m.classList.remove("active"); });
+  }
+});
+
+// ===================================================================
+//  启动
+// ===================================================================
+initTheme();
+setStatus("就绪 — 纯前端版，可直接打开 HTML 使用");
+
+_log("INFO", "检测数据统计工具 v" + VERSION + " (独立 HTML 版) 就绪");
+_log("INFO", "作者: HotLL | 技术: SheetJS + 原生 JavaScript");
+</script>
+</body>
+</html>
