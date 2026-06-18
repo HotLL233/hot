@@ -312,6 +312,9 @@ def read_sheet_data(file_path: str, sheet_name: str, chunk_size: int = 1000) -> 
         df.columns = [DATE_COL, BATCH_COL]
         df[DATE_COL] = df[DATE_COL].apply(_ensure_date_str)
         df[BATCH_COL] = df[BATCH_COL].astype(str).str.strip()
+        # 修复：astype(str) 会将 NaN 转为字符串 "nan"，用 pd.NA 替换避免被计入统计
+        pd, _ = _lazy_import_pandas()
+        df.loc[df[BATCH_COL].isin(['nan', 'none', '']), BATCH_COL] = pd.NA
         
         # 前向填充日期（合并单元格场景）
         df[DATE_COL] = df[DATE_COL].replace("", pd.NA).ffill()

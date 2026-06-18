@@ -8,12 +8,13 @@
 #define MyAppExeName "检测数据统计工具_v2.2.14.exe"
 
 [Setup]
-AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}
+AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-DefaultDirName={autopf}\{#MyAppName}
+; 安装到用户目录，避免需要管理员权限（pywebview/tkinter 在管理员模式下可能异常）
+DefaultDirName={localappdata}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=dist
@@ -22,7 +23,9 @@ Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
 UninstallDisplayIcon={app}\{#MyAppExeName}
-PrivilegesRequired=admin
+; 不需要管理员权限 — 管理员模式下 pywebview WebView2 窗口可能无法正常创建
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
 SetupIconFile=app_icon.ico
 
 [Languages]

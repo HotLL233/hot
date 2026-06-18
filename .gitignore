@@ -2,6 +2,9 @@
 build/
 
 dist/
+
+# Tauri frontend build output (small static files, tracked as source)
+!rust-tool/dist/
 *.spec
 *.log
 打包输出/
@@ -24,3 +27,8 @@ Web 版本/
 setup_cx_freeze.py
 # Output directory now tracked to include installer exe
 Output/
+
+# Rust / Tauri build artifacts
+rust-tool/src-tauri/target/
+rust-tool/target/
+rust-tool/node_modules/

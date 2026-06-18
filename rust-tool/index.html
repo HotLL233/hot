@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>检测数据统计工具 v2.2.14 (Rust)</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-card: #1c2128;
+    --bg-hover: #21262d;
+    --border: #30363d;
+    --text-primary: #e6edf3;
+    --text-secondary: #8b949e;
+    --text-dim: #6e7681;
+    --purple-start: #6e45e2;
+    --purple-end: #88d3ce;
+    --green-start: #11998e;
+    --green-end: #38ef7d;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 15px rgba(0,0,0,0.35);
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --transition: 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  body {
+    font-family: 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .sidebar {
+    width: 220px; min-width: 220px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    padding: 16px 12px; overflow-y: auto;
+  }
+  .sidebar-brand {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px 16px;
+    font-size: 16px; font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .sidebar-brand .logo-icon { font-size: 22px; }
+  .sidebar .version-badge {
+    font-size: 11px; color: var(--text-dim);
+    text-align: center; margin-top: auto;
+    border-top: 1px solid var(--border); padding-top: 12px;
+  }
+  .galaxy-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; margin: 2px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-size: 13px; cursor: pointer;
+    transition: var(--transition);
+    width: 100%; text-align: left;
+  }
+  .galaxy-btn:hover { background: var(--bg-hover); border-color: var(--text-dim); transform: translateY(-1px); }
+  .galaxy-btn .btn-icon { font-size: 16px; width: 20px; text-align: center; }
+  .galaxy-btn.primary { border-color: var(--purple-start); }
+  .galaxy-btn.primary:hover { background: linear-gradient(135deg, var(--purple-start), var(--purple-end)); color: #fff; }
+  .galaxy-btn.success { border-color: var(--green-start); }
+  .galaxy-btn.success:hover { background: linear-gradient(135deg, var(--green-start), var(--green-end)); color: #fff; }
+  .galaxy-btn.danger { border-color: #e74c3c; }
+  .galaxy-btn.danger:hover { background: linear-gradient(135deg, #e74c3c, #c0392b); color: #fff; }
+  .back-link {
+    display: inline-block; margin-bottom: 8px;
+    color: var(--purple-start); font-size: 12px; cursor: pointer;
+  }
+  .back-link:hover { text-decoration: underline; }
+  .main-content {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .status-bar {
+    padding: 10px 20px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    font-size: 13px; color: var(--text-secondary);
+    min-height: 42px;
+  }
+  .content-panel {
+    flex: 1; overflow: auto; padding: 20px;
+  }
+  .file-list { margin-bottom: 20px; }
+  .file-list h3 { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+  .file-count { color: var(--purple-start); font-weight: 700; }
+  .file-items { list-style: none; }
+  .file-item {
+    padding: 8px 12px; margin: 2px 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; transition: var(--transition);
+  }
+  .file-item:hover { background: var(--bg-hover); border-color: var(--text-dim); }
+  .file-item.active { border-color: var(--purple-start); background: rgba(110,69,226,0.1); }
+  .file-item .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-empty {
+    padding: 30px; text-align: center;
+    color: var(--text-dim); font-size: 14px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-md);
+  }
+  .table-wrapper { overflow-x: auto; }
+  table.stats-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  table.stats-table th {
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    padding: 8px 12px; text-align: center;
+    border: 1px solid var(--border);
+    font-weight: 600; white-space: nowrap; position: sticky; top: 0; z-index: 1;
+  }
+  table.stats-table td {
+    padding: 6px 12px; text-align: center;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  table.stats-table tr:hover td { background: var(--bg-hover); }
+  table.stats-table .total-row { font-weight: 700; background: rgba(110,69,226,0.08); }
+  .engine-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-left: 6px;
+  }
+  @media (max-width: 720px) {
+    .sidebar { width: 56px; min-width: 56px; padding: 12px 6px; }
+    .sidebar-brand span:last-child, .galaxy-btn span:last-child { display: none; }
+    .galaxy-btn { justify-content: center; padding: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-brand">
+    <span class="logo-icon">&#128202;</span>
+    <span>检测数据统计</span>
+  </div>
+  <button class="galaxy-btn primary" onclick="importFiles()" style="margin-top:6px;">
+    <span class="btn-icon">&#128194;</span> 导入文件
+  </button>
+  <button class="galaxy-btn primary" onclick="importFolder()" style="margin-top:6px;">
+    <span class="btn-icon">&#128193;</span> 导入文件夹
+  </button>
+  <button class="galaxy-btn success" onclick="processAll()">
+    <span class="btn-icon">&#9889;</span> 开始统计
+  </button>
+  <button class="galaxy-btn danger" onclick="clearAll()">
+    <span class="btn-icon">&#128465;</span> 清空列表
+  </button>
+  <button class="galaxy-btn success" onclick="exportResults()" style="margin-top:12px;">
+    <span class="btn-icon">&#128229;</span> 导出结果
+  </button>
+  <div class="version-badge">
+    版本: v<span id="verDisplay">2.2.14</span> <span class="engine-badge">RUST</span><br>
+    <span style="font-size:10px;">引擎: Rust + Tauri · ~5MB</span>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="status-bar" id="statusBar">
+    <span id="statusText">就绪 — Rust 引擎已加载</span>
+  </div>
+  <div class="content-panel">
+    <div class="file-list">
+      <div id="backLink" style="display:none;">
+        <span class="back-link" onclick="backToAll()">&#8592; 返回全部文件统计</span>
+      </div>
+      <h3>&#128203; 文件列表 <span class="file-count" id="fileCount">0</span></h3>
+      <ul class="file-items" id="fileList">
+        <li class="file-empty" id="emptyHint">点击「导入文件」或拖拽 .xlsx 到窗口</li>
+      </ul>
+    </div>
+    <div class="table-wrapper" id="tableWrapper" style="display:none;">
+      <table class="stats-table" id="statsTable">
+        <thead id="tableHead"></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- Tauri API 适配 ----
+const invoke = window.__TAURI__ ? window.__TAURI__.core.invoke : null;
+const openDialog = window.__TAURI__ ? window.__TAURI__.dialog : null;
+
+var allFiles = [];
+var isProcessing = false;
+var currentViewFileIndex = -1;  // -1 = 全部文件汇总视图
+var cachedAllResults = null;   // 缓存汇总结果，用于返回全部视图
+
+function setStatus(text) {
+  document.getElementById('statusText').textContent = text;
+}
+
+function updateFileList(files) {
+  var list = document.getElementById('fileList');
+  var count = document.getElementById('fileCount');
+  var empty = document.getElementById('emptyHint');
+  list.innerHTML = '';
+  if (!files || files.length === 0) {
+    list.appendChild(empty);
+    count.textContent = '0';
+    return;
+  }
+  count.textContent = files.length;
+  files.forEach(function(name, idx) {
+    var li = document.createElement('li');
+    li.className = 'file-item';
+    if (idx === currentViewFileIndex) li.classList.add('active');
+    li.setAttribute('data-index', idx);
+    li.onclick = function() { viewFile(idx); };
+    li.innerHTML = '<span class="file-icon">&#128203;</span><span class="file-name">' + name + '</span>';
+    list.appendChild(li);
+  });
+}
+
+function renderTable(data) {
+  var wrapper = document.getElementById('tableWrapper');
+  var thead = document.getElementById('tableHead');
+  var tbody = document.getElementById('tableBody');
+  if (!data || !data.columns || !data.rows) { wrapper.style.display = 'none'; return; }
+  var h = '<tr><th>' + data.columns.join('</th><th>') + '</th></tr>';
+  thead.innerHTML = h;
+  var b = '';
+  for (var i = 0; i < data.rows.length; i++) {
+    var cls = (i === data.rows.length - 1) ? ' class="total-row"' : '';
+    b += '<tr' + cls + '><td>' + data.rows[i].join('</td><td>') + '</td></tr>';
+  }
+  tbody.innerHTML = b;
+  wrapper.style.display = 'block';
+}
+
+// ---- 查看单个文件 ----
+async function viewFile(index) {
+  if (!invoke) { setStatus('请在 Tauri 环境中运行'); return; }
+  setStatus('正在加载文件预览...');
+  try {
+    var result = await invoke('get_results', { fileIndex: index });
+    currentViewFileIndex = index;
+    updateFileList(allFiles);
+    document.getElementById('backLink').style.display = 'block';
+    renderTable(result);
+    setStatus(result.mode || '文件预览');
+  } catch(e) { setStatus('预览失败: ' + e); }
+}
+
+// ---- 返回全部文件统计 ----
+function backToAll() {
+  currentViewFileIndex = -1;
+  updateFileList(allFiles);
+  document.getElementById('backLink').style.display = 'none';
+  if (cachedAllResults) {
+    renderTable(cachedAllResults);
+    setStatus('全部文件统计');
+  } else {
+    processAll();
+  }
+}
+
+// ---- 导出结果 ----
+async function exportResults() {
+  if (!invoke || !openDialog) { setStatus('请在 Tauri 环境中运行'); return; }
+  if (allFiles.length === 0) { setStatus('没有文件可以导出'); return; }
+  try {
+    var dir = await openDialog.open({ directory: true, title: '选择导出目录' });
+    if (!dir) return;
+    setStatus('正在导出 ' + allFiles.length + ' 个文件...');
+    var msg = await invoke('batch_export', { exportDir: dir });
+    setStatus(msg);
+  } catch(e) { setStatus('导出失败: ' + e); }
+}
+
+// ---- 导入文件 ----
+async function importFiles() {
+  if (!openDialog) { setStatus('请在 Tauri 环境中运行'); return; }
+  try {
+    var files = await openDialog.open({ multiple: true, filters: [{ name: 'Excel', extensions: ['xlsx'] }] });
+    if (!files || files.length === 0) return;
+    setStatus('正在导入 ' + files.length + ' 个文件...');
+    var result = await invoke('import_files', { paths: files });
+    allFiles = result.files || [];
+    currentViewFileIndex = -1;
+    document.getElementById('backLink').style.display = 'none';
+    updateFileList(allFiles);
+    setStatus(result.status || '就绪');
+    if (result.results) { cachedAllResults = result.results; renderTable(result.results); }
+  } catch(e) { setStatus('导入失败: ' + e); }
+}
+
+// ---- 导入文件夹 ----
+async function importFolder() {
+  if (!openDialog) { setStatus('请在 Tauri 环境中运行'); return; }
+  try {
+    var dir = await openDialog.open({ directory: true, title: '选择文件夹' });
+    if (!dir) return;
+    setStatus('正在扫描文件夹...');
+    var result = await invoke('import_folder', { path: dir });
+    allFiles = result.files || [];
+    currentViewFileIndex = -1;
+    document.getElementById('backLink').style.display = 'none';
+    updateFileList(allFiles);
+    setStatus(result.status || '就绪');
+    if (result.results) { cachedAllResults = result.results; renderTable(result.results); }
+  } catch(e) { setStatus('导入文件夹失败: ' + e); }
+}
+
+// ---- 开始统计 ----
+async function processAll() {
+  if (!invoke) { setStatus('请在 Tauri 环境中运行'); return; }
+  setStatus('正在统计...');
+  try {
+    var result = await invoke('process_files');
+    allFiles = result.files || [];
+    currentViewFileIndex = -1;
+    document.getElementById('backLink').style.display = 'none';
+    updateFileList(allFiles);
+    if (result.results) { cachedAllResults = result.results; renderTable(result.results); }
+    setStatus(result.status || '处理完成');
+  } catch(e) { setStatus('处理失败: ' + e); }
+}
+
+// ---- 清空 ----
+async function clearAll() {
+  if (!invoke) { setStatus('请在 Tauri 环境中运行'); return; }
+  await invoke('clear_all');
+  allFiles = [];
+  currentViewFileIndex = -1;
+  cachedAllResults = null;
+  document.getElementById('backLink').style.display = 'none';
+  updateFileList([]);
+  document.getElementById('tableWrapper').style.display = 'none';
+  setStatus('已清空');
+}
+
+// ---- 版本显示 ----
+if (invoke) {
+  invoke('get_version').then(function(v) {
+    document.getElementById('verDisplay').textContent = v;
+  });
+}
+
+// ---- 拖拽 ----
+document.addEventListener('dragover', function(e) { e.preventDefault(); });
+document.addEventListener('drop', function(e) { e.preventDefault(); });
+</script>
+</body>
+</html>
