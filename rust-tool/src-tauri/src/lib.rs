@@ -419,13 +419,10 @@ fn batch_export(export_dir: String, state: State<AppState>) -> Result<String, St
     if let Ok(mut ed) = state.export_dir.lock() { *ed = export_dir.clone(); }
     fs::create_dir_all(&export_dir).map_err(|e| format!("创建目录失败: {}", e))?;
 
-    let font_name = "仿宋";
-    let fh = Format::new().set_font_name(font_name).set_font_size(14).set_bold()
-        .set_border(FormatBorder::Thin).set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter);
-    let fd = Format::new().set_font_name(font_name).set_font_size(14)
-        .set_border(FormatBorder::Thin).set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter);
-    let fb = Format::new().set_font_name(font_name).set_font_size(14).set_bold()
-        .set_border(FormatBorder::Thin).set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter);
+    fn ch_w(s: &str) -> f64 { s.chars().map(|c| if c as u32 > 127 { 2.0 } else { 1.0 }).sum() }
+    let fh = Format::new().set_font_name("仿宋").set_font_size(14).set_bold().set_border(FormatBorder::Thin).set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter);
+    let fd = Format::new().set_font_name("仿宋").set_font_size(14).set_border(FormatBorder::Thin).set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter);
+    let fb = Format::new().set_font_name("仿宋").set_font_size(14).set_bold().set_border(FormatBorder::Thin).set_align(FormatAlign::Center).set_align(FormatAlign::VerticalCenter);
 
     let mut success = 0u32;
     let mut failed: Vec<String> = Vec::new();
@@ -434,97 +431,95 @@ fn batch_export(export_dir: String, state: State<AppState>) -> Result<String, St
         let out_path = Path::new(&export_dir).join(format!("{}_统计结果.xlsx", base));
         let per_sheet = match process_file_for_export(path) {
             Some(r) => r,
-            None => {
-                failed.push(Path::new(path).file_name().unwrap().to_string_lossy().to_string());
-                continue;
-            }
+            None => { failed.push(Path::new(path).file_name().unwrap().to_string_lossy().to_string()); continue; }
         };
-
-        // 保持 Sheet 出现顺序（Vec 已保证插入顺序）
         let sheet_names: Vec<&String> = per_sheet.iter().map(|(name, _)| name).collect();
-        // 收集所有日期
         let mut all_dates: BTreeSet<String> = BTreeSet::new();
-        for (_, daily) in &per_sheet {
-            all_dates.extend(daily.keys().cloned());
-        }
+        for (_, daily) in &per_sheet { all_dates.extend(daily.keys().cloned()); }
+        let ncols = sheet_names.len() + 2;
+        let total_col = (sheet_names.len() + 1) as u16;
 
         let mut wb = Workbook::new();
 
-        // Sheet 1: "每日批号统计" — 宽表：日期 | SheetA | SheetB | ... | 合计
+        // Sheet 1: 每日批号统计
         {
             let ws = wb.add_worksheet().set_name("每日批号统计").map_err(|e| e.to_string())?;
-            // 表头
             ws.write_string_with_format(0, 0, DATE_COL, &fh).ok();
-            ws.set_column_width(0, 14).ok();
+            let mut cw: Vec<f64> = vec![ch_w(DATE_COL); ncols];
             for (i, sn) in sheet_names.iter().enumerate() {
-                ws.write_string_with_format(0, (i + 1) as u16, sn, &fh).ok();
-                ws.set_column_width((i + 1) as u16, 14).ok();
+                ws.write_string_with_format(0, (i + 1) as u16, sn.as_str(), &fh).ok();
+                cw[i + 1] = cw[i + 1].max(ch_w(sn));
             }
-            let total_col = (sheet_names.len() + 1) as u16;
             ws.write_string_with_format(0, total_col, "合计", &fh).ok();
-            ws.set_column_width(total_col, 14).ok();
+            cw[ncols - 1] = cw[ncols - 1].max(ch_w("合计"));
 
-            // 数据行
             let mut row = 1u32;
-            let mut col_tots: Vec<usize> = vec![0; sheet_names.len()];
             for date in &all_dates {
                 ws.write_string_with_format(row, 0, date, &fd).ok();
+                cw[0] = cw[0].max(ch_w(date));
                 let mut row_total = 0usize;
                 for (i, (_, daily)) in per_sheet.iter().enumerate() {
                     let val = daily.get(date.as_str()).map(|s| s.len()).unwrap_or(0);
                     if val > 0 {
-                        ws.write_string_with_format(row, (i + 1) as u16, &val.to_string(), &fd)
-                            .ok();
+                        ws.write_number_with_format(row, (i + 1) as u16, val as f64, &fd).ok();
+                        cw[i + 1] = cw[i + 1].max(ch_w(&val.to_string()));
+                    } else {
+                        ws.write_string_with_format(row, (i + 1) as u16, "", &fd).ok();
                     }
                     row_total += val;
-                    col_tots[i] += val;
                 }
                 if row_total > 0 {
-                    ws.write_string_with_format(row, total_col, &row_total.to_string(), &fd)
-                        .ok();
+                    ws.write_number_with_format(row, total_col, row_total as f64, &fd).ok();
+                    cw[ncols - 1] = cw[ncols - 1].max(ch_w(&row_total.to_string()));
+                } else {
+                    ws.write_string_with_format(row, total_col, "", &fd).ok();
                 }
+                ws.set_row_height(row, 35.0).ok();
                 row += 1;
             }
 
-            // 合计行
+            // 合计行 SUM 公式（数据从第2行到第 data_end 行）
+            let data_end = all_dates.len() as u32 + 1;
             ws.write_string_with_format(row, 0, "合计", &fb).ok();
-            let mut grand = 0usize;
-            for (i, &ct) in col_tots.iter().enumerate() {
-                if ct > 0 {
-                    ws.write_string_with_format(row, (i + 1) as u16, &ct.to_string(), &fb)
-                        .ok();
-                }
-                grand += ct;
+            for i in 0..sheet_names.len() {
+                let cl = col_letter(i + 1);
+                ws.write_formula_with_format(row, (i + 1) as u16, format!("=SUM({cl}2:{cl}{data_end})").as_str(), &fb).ok();
             }
-            if grand > 0 {
-                ws.write_string_with_format(row, total_col, &grand.to_string(), &fb).ok();
-            }
+            let tcl = col_letter(sheet_names.len() + 1);
+            ws.write_formula_with_format(row, total_col, format!("=SUM({tcl}2:{tcl}{data_end})").as_str(), &fb).ok();
+
+            for i in 0..ncols { ws.set_column_width(i as u16, (cw[i] + 5.0).clamp(8.0, 30.0)).ok(); }
+            ws.set_row_height(0, 35.0).ok();
+            ws.set_row_height(row, 35.0).ok();
         }
 
-        // Sheet 2: "每日汇总" — 日期 | 合计（每日跨所有 Sheet 的总批次数）
+        // Sheet 2: 每日汇总
         {
-            let ws2 = wb.add_worksheet().set_name("每日汇总").map_err(|e| e.to_string())?;
-            ws2.write_string_with_format(0, 0, DATE_COL, &fh).ok();
-            ws2.write_string_with_format(0, 1, "合计", &fh).ok();
-            ws2.set_column_width(0, 14).ok();
-            ws2.set_column_width(1, 14).ok();
+            let ws = wb.add_worksheet().set_name("每日汇总").map_err(|e| e.to_string())?;
+            ws.write_string_with_format(0, 0, DATE_COL, &fh).ok();
+            ws.write_string_with_format(0, 1, "合计", &fh).ok();
+            let mut m0 = ch_w(DATE_COL); let mut m1 = ch_w("合计");
 
             let mut r2 = 1u32;
-            let mut sum_total = 0usize;
             for date in &all_dates {
-                let daily_total: usize = per_sheet
-                    .iter()
-                    .map(|(_, daily)| daily.get(date.as_str()).map(|s| s.len()).unwrap_or(0))
-                    .sum();
-                if daily_total > 0 {
-                    ws2.write_string_with_format(r2, 0, date, &fd).ok();
-                    ws2.write_string_with_format(r2, 1, &daily_total.to_string(), &fd).ok();
-                    sum_total += daily_total;
+                ws.write_string_with_format(r2, 0, date, &fd).ok();
+                m0 = m0.max(ch_w(date));
+                let dt: usize = per_sheet.iter().map(|(_, d)| d.get(date.as_str()).map(|s| s.len()).unwrap_or(0)).sum();
+                if dt > 0 {
+                    ws.write_number_with_format(r2, 1, dt as f64, &fd).ok();
+                } else {
+                    ws.write_string_with_format(r2, 1, "", &fd).ok();
                 }
+                ws.set_row_height(r2, 35.0).ok();
                 r2 += 1;
             }
-            ws2.write_string_with_format(r2, 0, "合计", &fb).ok();
-            ws2.write_string_with_format(r2, 1, &sum_total.to_string(), &fb).ok();
+            let de2 = all_dates.len() as u32 + 1;
+            ws.write_string_with_format(r2, 0, "合计", &fb).ok();
+            ws.write_formula_with_format(r2, 1, format!("=SUM(B2:B{de2})").as_str(), &fb).ok();
+            ws.set_column_width(0, (m0 + 5.0).clamp(8.0, 30.0)).ok();
+            ws.set_column_width(1, (m1 + 5.0).clamp(8.0, 30.0)).ok();
+            ws.set_row_height(0, 35.0).ok();
+            ws.set_row_height(r2, 35.0).ok();
         }
 
         if wb.save(&out_path).is_err() {
@@ -535,12 +530,7 @@ fn batch_export(export_dir: String, state: State<AppState>) -> Result<String, St
     }
     app_log(&state, format!("批量导出：成功 {} / {} 个文件", success, paths.len()));
     if !failed.is_empty() {
-        Ok(format!(
-            "成功导出 {} / {} 个文件，失败: {}",
-            success,
-            paths.len(),
-            failed.join(", ")
-        ))
+        Ok(format!("成功导出 {} / {} 个文件，失败: {}", success, paths.len(), failed.join(", ")))
     } else {
         Ok(format!("成功导出 {} 个文件到目录: {}", success, export_dir))
     }

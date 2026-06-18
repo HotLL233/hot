@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "检测数据统计工具 v2.2.14 (Rust)",
+        "title": "检测数据统计工具 v5.0.0 (Rust)",
         "width": 960,
         "height": 640,
         "minWidth": 800,

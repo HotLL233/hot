@@ -8,22 +8,21 @@
 <style>
   *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
   :root {
-    --bg-primary: #0d1117;
-    --bg-secondary: #161b22;
-    --bg-card: #1c2128;
-    --bg-hover: #21262d;
-    --border: #30363d;
-    --text-primary: #e6edf3;
-    --text-secondary: #8b949e;
-    --text-dim: #6e7681;
+    --bg-primary: #f5f7fa;
+    --bg-secondary: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #f0f2f5;
+    --border: #e4e7ed;
+    --text-primary: #303133;
+    --text-secondary: #606266;
+    --text-dim: #909399;
     --purple-start: #6e45e2;
     --purple-end: #88d3ce;
     --blue-start: #2b5876;
     --blue-end: #4e4376;
-    --green-start: #11998e;
-    --green-end: #38ef7d;
-    --red-start: #eb3349;
-    --red-end: #f45c43;
+    --green-start: #67c23a;
+    --red-start: #f56c6c;
+    --gold-start: #e6a23c;
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
     --shadow-md: 0 4px 15px rgba(0,0,0,0.35);
     --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
@@ -322,7 +321,7 @@
   <div class="header">
     <h1>检测数据统计工具</h1>
     <div class="header-actions">
-      <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="themeBtn">&#9788;</button>
+      <button class="theme-toggle" onclick="toggleTheme()" title="&#26263;/&#20142;" id="themeBtn">&#9728;</button>
       <button class="header-btn" onclick="showAbout()">关于</button>
       <button class="header-btn" onclick="showLog()">审计日志</button>
     </div>
@@ -649,7 +648,7 @@ async function checkUpdateInAbout() {
 }
 
 // ---- 主题切换 ----
-var themeLight = false;
+var themeLight = true;
 function toggleTheme() {
   themeLight = !themeLight;
   if (themeLight) {
@@ -661,7 +660,8 @@ function toggleTheme() {
     document.documentElement.style.setProperty('--text-primary', '#303133');
     document.documentElement.style.setProperty('--text-secondary', '#606266');
     document.documentElement.style.setProperty('--text-dim', '#909399');
-    document.getElementById('themeBtn').textContent = '&#9790;';
+    document.getElementById('themeBtn').innerHTML = '&#9789;';
+    document.getElementById('themeBtn').title = '切换暗色';
   } else {
     var root = document.documentElement;
     root.style.setProperty('--bg-primary', '#0d1117');
@@ -672,7 +672,8 @@ function toggleTheme() {
     root.style.setProperty('--text-primary', '#e6edf3');
     root.style.setProperty('--text-secondary', '#8b949e');
     root.style.setProperty('--text-dim', '#6e7681');
-    document.getElementById('themeBtn').textContent = '&#9788;';
+    document.getElementById('themeBtn').innerHTML = '&#9728;';
+    document.getElementById('themeBtn').title = '切换亮色';
   }
 }
 
